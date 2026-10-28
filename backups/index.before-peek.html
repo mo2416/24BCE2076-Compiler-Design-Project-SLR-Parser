@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SLR(1) Parser · Step by Step</title>
+<meta name="description" content="Enter a grammar and an input string; the SLR(1) parser is built and run one step at a time. Practice mode makes you do each step yourself.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='3' width='20' height='26' fill='%23fff' stroke='%230f7c80' stroke-width='1.8'/%3E%3Cpath d='M10 11h12M10 16h12M10 21h8' stroke='%232d4ea6' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Caveat:wght@500;700&family=Cousine:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;--desk:#ececec;--paper:#fff;--print:#1d1d1d;--muted:#6b6b6b;--rule:#c9c9c9;--ink:#222222;--red:#c62d2d;--teal:#111111;--teal-d:#111111;--teal-w:#f0f0f0;--ok:#2f8a4a;
+  --on-teal:#fff;--head:#f4f4f4;--shadow:#c4c0b8;--good-bg:#e9f5ec;--bad-bg:#fbe9e9;--good-box:#f2faf4;--bad-box:#fdf3f3;--line:#eee;--warn:#9a5b00;--bar:#111111}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--desk:#121212;--paper:#1d1d1f;--print:#e8e8e8;--muted:#a3a3a3;--rule:#46464a;--ink:#f2f2f2;--red:#ff7070;--teal:#e8e8e8;--teal-d:#f2f2f2;--teal-w:#2c2c30;--ok:#5fcf7f;
+  --on-teal:#111;--head:#28282b;--shadow:#000;--good-bg:#173a22;--bad-bg:#43191b;--good-box:#152a1c;--bad-box:#311719;--line:#2e2e32;--warn:#e7a948;--bar:#000}}
+:root[data-theme="dark"]{color-scheme:dark;--desk:#121212;--paper:#1d1d1f;--print:#e8e8e8;--muted:#a3a3a3;--rule:#46464a;--ink:#f2f2f2;--red:#ff7070;--teal:#e8e8e8;--teal-d:#f2f2f2;--teal-w:#2c2c30;--ok:#5fcf7f;
+  --on-teal:#111;--head:#28282b;--shadow:#000;--good-bg:#173a22;--bad-bg:#43191b;--good-box:#152a1c;--bad-box:#311719;--line:#2e2e32;--warn:#e7a948;--bar:#000}
+
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--desk);color:var(--print);font:15px/1.55 "Lora",Georgia,serif}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 18px;background:var(--bar);color:#e3eef0;font:600 14px system-ui,sans-serif}
+.bar b{font-size:16px;margin-right:6px}
+.bar .sp{flex:1}
+.seg{display:flex;background:rgba(255,255,255,.12);border-radius:7px;padding:2px}
+.seg button{border:0;background:none;color:#cfe3e5;padding:6px 14px;border-radius:6px}
+.seg button.on{background:#fff;color:#111}
+.btn{border:0;background:var(--paper);color:var(--print);border-radius:6px;padding:7px 14px;font:600 14px system-ui,sans-serif}
+.btn.pri{background:var(--teal);color:var(--on-teal)}
+.bar .btn{background:#fff;color:#111}
+.bar .btn.pri{background:#fff;color:#111}
+.btn:disabled{opacity:.4;cursor:default}
+.cnt{min-width:120px;text-align:center;color:#cfe3e5;font-weight:400}
+.sheet{width:min(920px,96vw);margin:22px auto 30px;background:var(--paper);box-shadow:0 2px 0 var(--shadow),0 20px 40px -20px rgba(0,0,0,.45);padding:40px 56px 56px;position:relative}
+/* grammar input card */
+.inputs{width:min(920px,96vw);margin:22px auto 0;background:var(--paper);border-top:4px solid var(--teal);box-shadow:0 2px 0 var(--shadow);padding:22px 30px 24px}
+.inputs h2{margin:0 0 4px;font:700 18px "Lora"}.inputs>p{margin:0 0 14px;color:var(--muted);font-size:14px}
+.inputs.collapsed #editor{display:none}
+.summary{display:none;font:15px "Cousine";color:var(--print)}
+.inputs.collapsed .summary{display:block}
+.pe-top{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.pe-label{display:block;font:600 13px system-ui,sans-serif;color:var(--muted);margin-bottom:4px}
+.pe-stepper{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.pe-stepper button{width:34px;border:0;background:var(--teal-w);font-size:17px;color:var(--teal-d)}
+.pe-stepper input{width:56px;background:transparent;border:0;border-left:1px solid var(--rule);border-right:1px solid var(--rule);text-align:center;font:600 16px "Cousine";-moz-appearance:textfield}
+.pe-stepper input::-webkit-inner-spin-button{-webkit-appearance:none}
+.pe-off{opacity:.35;pointer-events:none}
+.pe-tools{display:flex;gap:8px}
+.pe-tools select,.pe-mode{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:6px 10px;font:14px system-ui,sans-serif}
+.pe-rows{list-style:none;margin:0 0 12px;padding:0;border-top:1px solid var(--rule)}
+.pe-row{display:grid;grid-template-columns:44px 100px 30px minmax(0,1fr) 38px 34px;align-items:center;border-bottom:1px solid var(--rule);min-height:42px}
+.pe-n{color:var(--muted);font:14px "Cousine"}
+.pe-row input{border:0;background:none;font:17px "Cousine";padding:6px 4px;min-width:0}
+.pe-row input:focus{outline:none;box-shadow:inset 0 -2px 0 var(--teal)}
+.pe-lhs{font-weight:700!important}
+.pe-arrow{text-align:center;color:var(--muted)}
+.pe-eps,.pe-del{border:0;background:none;color:var(--muted);font-size:16px;height:32px;border-radius:4px}
+.pe-eps:hover,.pe-del:hover:not(:disabled){background:var(--teal-w);color:var(--teal-d)}
+.pe-del:disabled{opacity:.25}
+.pe-note{grid-column:4/-1;margin:-6px 0 6px;font:13px system-ui,sans-serif;color:var(--muted)}
+.pe-note-err{color:var(--red)}.pe-bad .pe-n{color:var(--red)}
+.pe-text{width:100%;border:1px solid var(--rule);background:var(--paper);font:16px/1.6 "Cousine";padding:10px;margin-bottom:6px}
+.pe-hint{font-size:13px;color:var(--muted);margin:0 0 10px}
+.pe-meta{display:grid;grid-template-columns:180px 1fr;gap:16px;margin-bottom:12px}
+.pe-start{border:1px solid var(--rule);border-radius:6px;font:15px "Cousine";padding:4px 8px;background:var(--paper);min-width:80px}
+.pe-syms>div{margin-bottom:4px}.pe-syms .pe-label{display:inline-block;width:110px;margin:0}
+.pe-chip{font:15px "Cousine";margin-right:10px}.pe-nt{color:var(--teal-d);font-weight:700}
+.pe-warn{font:13px system-ui,sans-serif;color:var(--warn);margin:4px 0 0}
+.pe-input{margin-bottom:10px}
+.pe-w{width:100%;border:0;border-bottom:2px solid var(--print);font:20px "Cousine";padding:6px 2px;background:none}
+.pe-w:focus{outline:none;border-bottom-color:var(--teal)}
+.pe-keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pe-key{border:1px solid var(--rule);background:var(--paper);border-radius:6px;font:15px "Cousine";padding:3px 12px;min-height:34px}
+.pe-key:hover{border-color:var(--teal)}
+.pe-space{display:flex;gap:8px;align-items:center;font:13px system-ui,sans-serif;color:var(--muted);margin-bottom:12px}
+.pe-error{color:var(--red);font:14px system-ui,sans-serif;border-left:3px solid var(--red);padding:4px 10px;margin:0 0 12px}
+.pe-build{border:0;background:var(--teal);color:var(--on-teal);border-radius:6px;padding:10px 22px;font:600 15px system-ui,sans-serif}
+/* worksheet */
+.head{border-bottom:2px solid var(--print);padding-bottom:10px;margin-bottom:18px}
+.head h1{font:700 22px/1.2 "Lora";margin:0}.head p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.head .g{font:15px "Cousine";color:var(--print)}
+h2.q{font:700 17px "Lora";margin:26px 0 8px}h2.q small{font-weight:400;color:var(--muted);font-size:13.5px;margin-left:6px}
+.qb{position:relative}
+.prod{font:15px "Cousine";margin:2px 0}
+.ink{font:700 23px/1 "Caveat",cursive;color:var(--ink)}
+.write{display:inline-block;animation:write .7s steps(14) both;clip-path:inset(0 100% 0 0)}
+@keyframes write{to{clip-path:inset(0 0 0 0)}}
+.ask{display:inline-block;min-width:34px;text-align:center;border:2px dashed var(--teal);border-radius:4px;color:var(--teal);font:700 18px "Cousine";padding:0 6px;background:var(--paper)}
+.blank{display:inline-block;min-width:90px;border-bottom:1px solid var(--print);min-height:24px;vertical-align:bottom;padding:0 4px}
+table.w{border-collapse:collapse;margin:6px 0}
+table.w th,table.w td{border:1px solid var(--print);padding:3px 10px;height:34px;text-align:left;vertical-align:middle}
+table.w th{font:600 13.5px "Lora";background:var(--head)}
+table.w.c td{text-align:center;padding:2px 4px;min-width:46px}
+table.w td.conf .ink{color:var(--red)}
+.scroll{overflow-x:auto}
+.states{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid var(--print);min-height:96px;padding:4px 8px 6px}
+.box b{font:700 14px "Lora"}
+.box .ink{font-size:19px;line-height:1.15;display:block}
+.trans{font:14px "Cousine";color:var(--muted);margin-top:6px}
+.note{position:absolute;right:-210px;width:190px;font:600 19px/1.15 "Caveat";color:var(--red);transform:rotate(-2deg)}
+.note::before{content:"";position:absolute;left:-26px;top:10px;width:22px;border-top:2px solid var(--red)}
+.cur{background:var(--teal-w)}
+.err{color:var(--red);font:15px system-ui,sans-serif}
+/* practice bar */
+.pbar{position:sticky;bottom:0;z-index:5;background:var(--paper);border-top:3px solid var(--teal);box-shadow:0 -8px 24px -12px rgba(0,0,0,.3);padding:14px 18px}
+.pbar-in{width:min(920px,96vw);margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
+.pbar .qtext{font:600 16px "Lora"}.pbar .qtext small{display:block;font:13px system-ui,sans-serif;color:var(--muted)}
+.pbar form{display:flex;gap:8px;align-items:center}
+.pbar input{width:170px;border:0;border-bottom:2px solid var(--print);font:700 24px "Caveat";color:var(--ink);background:none;padding:2px 4px}
+.pbar input:focus{outline:none;border-bottom-color:var(--teal)}
+.fb{grid-column:1/3;font:15px system-ui,sans-serif;min-height:22px}
+.fb.ok{color:var(--ok)}.fb.bad{color:var(--red)}
+.fb .why{color:var(--muted)}
+.tally{font:600 14px system-ui,sans-serif;color:#cfe3e5}
+.pin{border:0;border-bottom:1.5px solid var(--rule);background:transparent;font:700 21px/1.2 "Caveat",cursive;color:var(--ink);padding:2px 4px;max-width:100%}
+.pin:focus{outline:none;border-bottom-color:var(--teal)}
+.pin.good{background:var(--good-bg);border-bottom-color:var(--ok)}.pin.wrong{background:var(--bad-bg);border-bottom-color:var(--red)}
+.pta{width:100%;border:0;resize:vertical;font:700 19px/1.2 "Caveat",cursive;color:var(--ink);background:repeating-linear-gradient(transparent 0 22px,var(--line) 22px 23px);outline:none;margin-top:4px}
+.box.good{border-color:var(--ok);background:var(--good-box)}.box.wrong{border-color:var(--red);background:var(--bad-box)}
+.pctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.btn.line{border:1px solid var(--rule)}
+.bar .btn.line{border-color:transparent}
+.pmark{font:600 14px system-ui,sans-serif}.pmark.ok{color:var(--ok)}.pmark.bad{color:var(--red)}
+.pnotes{margin:8px 0 0;padding-left:20px;font:600 19px/1.2 "Caveat";color:var(--red)}
+.pnotes li{margin-bottom:4px}
+.ptotal{margin-top:24px;font:700 17px "Lora";border-top:2px solid var(--print);padding-top:10px}
+/* test mode */
+.clock{font:700 18px "Cousine";color:#fff;letter-spacing:.5px;min-width:92px;text-align:center}
+.clock.paused{color:#9a9a9a}
+.tsubmit{margin-top:30px;border-top:2px solid var(--print);padding-top:16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.tsubmit p{margin:0;color:var(--muted);font-size:14px;flex:1;min-width:220px}
+.tresult{border:2px solid var(--print);padding:14px 18px;margin:0 0 20px}
+.tresult h2{margin:0 0 6px;font:700 19px "Lora"}
+.tresult .big{font:700 30px "Cousine";margin-right:22px}
+.tresult table{border-collapse:collapse;margin-top:10px;font-size:14px}
+.tresult td{padding:2px 14px 2px 0}
+.pin[readonly],.pta[readonly]{cursor:not-allowed}
+.tbegin{border:2px dashed var(--teal);padding:14px 18px;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.tbegin p{margin:0;flex:1;min-width:220px;font-size:14px;color:var(--muted)}
+@media (max-width:1300px){.note{position:static;display:block;width:auto;transform:none;margin:4px 0 0}.note::before{display:none}}
+@media (max-width:700px){.sheet,.inputs{padding:22px 16px}.states{grid-template-columns:repeat(2,1fr)}.pe-row{grid-template-columns:34px 70px 22px minmax(0,1fr) 32px 30px}.pe-meta{grid-template-columns:1fr}.pbar-in{grid-template-columns:1fr}}
+@media print{.bar,.inputs,.pbar{display:none}body{background:#fff}.sheet{box-shadow:none;margin:0;width:auto}}
+@media (prefers-reduced-motion:reduce){.write{animation:none;clip-path:none}}
+</style></head>
+<body>
+<script>try{var t=localStorage.getItem('slr.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<div class="bar"><b>SLR(1) Parser</b><div class="seg"><button type="button" class="on" data-mode="teach">Teach</button><button type="button" data-mode="practice">Practice</button><button type="button" data-mode="test">Test</button></div><button type="button" class="btn line" id="theme" aria-label="Switch light or dark theme" title="Light / dark"></button><span class="sp"></span><span id="ctl"></span></div>
+
+<section class="inputs" id="inputs">
+  <h2>Grammar and input</h2>
+  <p>Fill one production per row (a new row appears as you type), then type the input string to parse (for example <span style="font-family:Cousine">aacb</span>). Or load an example.</p>
+  <div class="summary" id="summary"></div>
+  <div style="display:flex;gap:8px;margin:0 0 10px"><button type="button" class="btn line" id="clear">Clear grammar</button></div>
+  <div id="editor"></div>
+</section>
+
+<main class="sheet" id="sheet"></main>
+<div class="pbar" id="pbar" hidden><div class="pbar-in" id="pbar-in"></div></div>
+
+<script src="../js/grammar.js"></script><script src="../js/slr.js"></script><script src="../js/examples.js"></script><script src="../js/practice.js"></script><script src="../js/core.js"></script><script src="../js/lesson.js"></script><script src="../js/rows.js"></script>
+<script>
+(function(){'use strict';
+var $=function(q){return document.querySelector(q)},esc=Core.esc;
+var s=null,STEPS=[],M={mode:'teach',k:0,score:0,tries:0,answered:{}};
+
+/* ---------- build from the input card ---------- */
+var editor=new ProductionEditor($('#editor'),{onBuild:build,dynamic:true});
+function build(cfg){
+  var r=Core.build(cfg);
+  if(!r.ok){editor.showError(r.error);return}
+  if(r.s.tokenError)editor.showError(r.s.tokenError+' The construction is still shown; fix the input to see the parse.');else editor.showError('');
+  s=r.s;STEPS=Lesson.steps(s);M.k=0;M.score=0;M.answered={};PS.practice=freshP();PS.test=freshP();P=PS[M.mode]||PS.practice;
+  $('#summary').innerHTML='<b>'+esc(s.g.productions.slice(1).map(function(p){return SLR.prodStr(p)}).join('   ·   '))+'</b><br>input: '+esc(s.tokens?s.tokens.join(' '):'(invalid)')+'  <button type="button" class="btn line" id="edit" style="margin-left:10px">Edit</button>';
+  render();
+}
+
+/* ---------- worksheet at step k ----------
+   teach: steps 0..k are written, step k in fresh ink.
+   practice (ask): steps 0..k-1 are written, the place of step k shows "?". */
+function local(stage,upto){var n=-1;for(var i=0;i<=upto;i++)if(STEPS[i].stage===stage)n++;return n}
+function ink(t,fresh){return '<span class="ink'+(fresh?' write':'')+'">'+esc(t)+'</span>'}
+var ASK='<span class="ask">?</span>';
+function sheet(){
+  var ask=M.mode==='practice'&&!M.answered[M.k],k=M.k,upto=ask?k-1:k,st=STEPS[k],fresh=function(stage){return !ask&&st.stage===stage};
+  var note=function(stage){return !ask&&st.stage===stage?'<div class="note">'+esc(st.text)+'</div>':''};
+  var h='<div class="head"><h1>SLR(1) parsing</h1><p class="g">'+esc(s.g.productions.slice(1).map(function(p){return SLR.prodStr(p)}).join('    '))+'</p></div>';
+  /* Q1 */
+  h+='<h2 class="q">1. Augmented grammar <small>productions numbered from 0</small></h2><div class="qb">'+Core.prods(s).map(function(p){return '<div class="prod">('+p.index+')  '+(p.index===0?(upto>=0?ink(p.text,fresh('grammar')):(ask&&st.stage==='grammar'?ASK:'')):esc(p.text))+'</div>'}).join('')+note('grammar')+'</div>';
+  /* Q2 */
+  var fi=local('ff',upto),v=Core.ff(s,fi),fcur=st.stage==='ff'?s.an.ff.steps[st.ref.i]:null;
+  h+='<h2 class="q">2. FIRST and FOLLOW</h2><div class="qb"><table class="w"><tr><th></th><th>FIRST</th><th>FOLLOW</th></tr>'+v.rows.map(function(r){
+    function cell(kind,list){var here=fcur&&fcur.kind===kind&&fcur.of===r.nt,txt=list.length?'{ '+list.map(function(x){return x.sym}).join(', ')+' }':'';
+      return '<td style="min-width:210px" class="'+(here?'cur':'')+'">'+(txt?ink(txt,here&&!ask):'')+(here&&ask?' '+ASK:'')+'</td>'}
+    return '<tr><th>'+esc(r.nt)+'</th>'+cell('FIRST',fi<0?[]:r.first)+cell('FOLLOW',fi<0?[]:r.follow)+'</tr>'}).join('')+'</table>'+note('ff')+'</div>';
+  /* Q3 */
+  var ii=local('items',upto),it=ii<0?null:Core.items(s,ii),icur=st.stage==='items'?s.an.lr0.steps[st.ref.i]:null;
+  h+='<h2 class="q">3. Canonical collection of LR(0) items</h2><div class="qb"><div class="states">'+s.an.lr0.states.map(function(I){
+    var shown=it&&it.states.has(I.id),here=icur&&icur.state===I.id,info=Core.stateInfo(s,I.id);
+    var body=shown?info.items.map(function(l){return '<span class="ink'+(here&&!ask&&icur.type!=='existing'?' write':'')+'">'+esc(l.text)+'</span>'}).join(''):(here&&ask?'<div style="margin-top:8px">'+ASK+'</div>':'');
+    return '<div class="box'+(here?' cur':'')+'"><b>I'+I.id+'</b>'+body+'</div>'}).join('')+'</div>'+
+    (it?'<div class="trans">'+s.an.lr0.steps.slice(1,ii+1).map(function(x){return 'goto(I'+x.from+','+x.sym+')=I'+x.state}).join(' · ')+(icur&&ask&&icur.from!==null?' · goto(I'+icur.from+','+icur.sym+')=?':'')+'</div>':'')+note('items')+'</div>';
+  /* Q4 */
+  var ti=local('table',upto),t=Core.tableAt(s,ti),cols=t.terminals.concat(t.nonTerminals),tcur=st.stage==='table'?s.an.table.fills[st.ref.i]:null;
+  h+='<h2 class="q">4. SLR(1) parsing table</h2><div class="qb scroll"><table class="w c"><tr><th>state</th>'+cols.map(function(c){return '<th style="text-align:center">'+esc(c)+'</th>'}).join('')+'</tr>'+t.rows.map(function(r){return '<tr><th>'+r.state+'</th>'+r.cells.map(function(c){var here=tcur&&tcur.state===r.state&&tcur.sym===c.sym;
+    return '<td class="'+(here?'cur':'')+(c.kind==='conf'?' conf':'')+'">'+(c.text?ink(c.text,here&&!ask):'')+(here&&ask?ASK:'')+'</td>'}).join('')+'</tr>'}).join('')+'</table>'+note('table')+'</div>';
+  /* Q5 */
+  var cf=Core.conflicts(s),ci=STEPS.findIndex(function(x){return x.stage==='conflicts'});
+  h+='<h2 class="q">5. Is the grammar SLR(1)?</h2><div class="qb">Answer: <span class="blank'+(st.stage==='conflicts'?' cur':'')+'">'+(upto>=ci?ink(cf.isSLR?'Yes, no cell has two entries':'No: '+cf.list.map(function(x){return x.type+' in I'+x.state+' on '+x.sym}).join('; '),fresh('conflicts')):(ask&&st.stage==='conflicts'?ASK:''))+'</span>'+note('conflicts')+'</div>';
+  /* Q6 */
+  h+='<h2 class="q">6. Parse the input'+(s.tokens?' <span style="font-family:Cousine">'+esc(s.tokens.join(' '))+' $</span>':'')+'</h2><div class="qb">';
+  if(!s.sim)h+='<p class="err">'+esc(s.tokenError||'No input string.')+'</p>';
+  else{var pi=local('parse',upto),pcur=st.stage==='parse'?st.ref.i:-1,all=Core.traceRows(s);
+    h+='<table class="w"><tr><th>#</th><th>Stack</th><th>Input</th><th>Action</th></tr>'+all.map(function(r,i){var show=i<=pi,here=i===pcur,fr=here&&!ask;
+      return '<tr class="'+(here?'cur':'')+'"><td>'+r.n+'</td><td style="min-width:220px">'+(show||here?ink(r.stack,fr):'')+'</td><td style="min-width:120px">'+(show||here?ink(r.input,fr):'')+'</td><td style="min-width:180px">'+(show?ink(r.action,fr):here&&ask?ASK:'')+'</td></tr>'}).join('')+'</table>';
+    var last=s.sim.steps[s.sim.steps.length-1];if(pi===all.length-1)h+='<p>'+ink(last.type==='accept'?'Accepted ✓':'Rejected: unexpected '+last.error.symbol,fresh('parse'))+'</p>'}
+  return h+note('parse')+'</div>';
+}
+
+/* ---------- step-by-step practice: the student does step k ---------- */
+function question(st){var r=st.ref;
+  if(st.stage==='ff'){var x=s.an.ff.steps[r.i];return {q:'Which symbol is added next to '+x.kind+'('+x.of+')?',hint:'Use the rules for '+x.kind+'. Type the symbol (eps for ε).',ans:x.sym,check:function(a){a=a.trim();return a===x.sym||(x.sym==='ε'&&/^(eps|epsilon|e|ε|#)$/i.test(a))}}}
+  if(st.stage==='items'){var y=s.an.lr0.steps[r.i];if(y.type==='start')return null;return {q:'goto(I'+y.from+', '+y.sym+') = ?',hint:'Move the dot over '+y.sym+'. Same kernel as an existing state? Then give that state. Otherwise the next new number.',ans:'I'+y.state,check:function(a){return a.trim().replace(/^i/i,'')===String(y.state)}}}
+  if(st.stage==='table'){var f=s.an.table.fills[r.i],e=SLR.entryStr(f.entry);return {q:(f.table==='goto'?'GOTO':'ACTION')+'['+f.state+', '+f.sym+'] = ?',hint:'Shift on goto with a terminal (sN), reduce only under FOLLOW (rN), accept on $ (acc), GOTO is a state number.',ans:e,check:function(a){return Practice.normalizeEntry(a)===Practice.normalizeEntry(e)}}}
+  if(st.stage==='conflicts'){var c=Core.conflicts(s);return {q:'Is the grammar SLR(1)? (yes / no)',hint:'Did any cell of the table get two entries?',ans:c.isSLR?'yes':'no',check:function(a){return /^y/i.test(a.trim())===c.isSLR&&/^[yn]/i.test(a.trim())}}}
+  if(st.stage==='parse'){var p=s.sim.steps[r.i],a2=p.type==='accept'?'acc':p.type==='error'?'err':p.action;return {q:'Stack '+Core.stackText(p.stack)+'  ·  next symbol '+p.input[p.ip]+'  ·  what is the next move?',hint:'Look up ACTION['+p.stack[p.stack.length-1].state+', '+p.input[p.ip]+']. Answer sN, rN, acc or err.',ans:a2,check:function(a){return Practice.normalizeEntry(a)===Practice.normalizeEntry(a2)}}}
+  return null}
+function pbar(){
+  var box=$('#pbar');if(M.mode!=='practice'){box.hidden=true;return}box.hidden=false;
+  var st=STEPS[M.k],q=question(st),done=M.answered[M.k];
+  if(!q){$('#pbar-in').innerHTML='<div class="qtext">'+esc(st.title)+'<small>'+esc(st.text)+'</small></div><button class="btn pri" id="pnext" type="button">Next step ▶</button>';return}
+  $('#pbar-in').innerHTML='<div class="qtext">Step '+(M.k+1)+' of '+STEPS.length+': '+esc(q.q)+'<small>'+esc(q.hint)+'</small></div>'+
+    (done?'<button class="btn pri" id="pnext" type="button">'+(M.k===STEPS.length-1?'Finish':'Next step ▶')+'</button>':'<form id="pform"><input id="pans" autocomplete="off" aria-label="Your answer"><button class="btn pri" type="submit">Check</button><button class="btn line" type="button" id="show">Show</button></form>')+
+    '<div class="fb" id="fb"></div>';
+  if(!done){var i=$('#pans');i.focus({preventScroll:true})}
+}
+function answer(text,reveal){
+  var st=STEPS[M.k],q=question(st),ok=!reveal&&q.check(text),fb=$('#fb');
+  if(ok||reveal){if(ok&&!M.tries)M.score++;M.answered[M.k]=true;M.tries=0;render();
+    var f=$('#fb');f.className='fb '+(ok?'ok':'bad');f.innerHTML=(ok?'✓ Correct. ':'The answer is <b>'+esc(q.ans)+'</b>. ')+'<span class="why">'+esc(st.text)+'</span>';return}
+  M.tries++;fb.className='fb bad';fb.innerHTML='✗ Not '+esc(text||'blank')+'. Try again, or press Show. <span class="why">'+esc(q.hint)+'</span>';
+}
+/* ---------- practice from scratch: the student fills the whole worksheet ----------
+   P.v holds what was typed (by input id); P.res[section] holds the marks after Check. */
+function freshP(){return {v:{},res:{},shown:{},nStates:1,nRows:1,t0:0,acc:0,begun:false,submitted:false,time:0,score:null}}
+var PS={practice:freshP(),test:freshP()},P=PS.practice;
+function TEST(){return M.mode==='test'}
+function locked(){return TEST()&&(P.submitted||!P.begun)}
+function val(id){return (P.v[id]||'').trim()}
+function norm(t){return String(t).replace(/\s+/g,'').replace(/->|-->|::=/g,'→').replace(/\./g,'•').replace(/[’′']/g,"'")}
+function setOf(t){return Practice.parseSymbolSet(t,s.g.terminals).slice().sort().join(',')}
+function inp(id,w,ph){var r=P.res.cells&&P.res.cells[id];return '<input class="pin'+(r===true?' good':r===false?' wrong':'')+'" id="'+id+'" value="'+esc(P.v[id]||'')+'" style="width:'+(w||120)+'px" placeholder="'+(ph||'')+'" autocomplete="off" spellcheck="false"'+(locked()?' readonly':'')+'>'}
+function ctlRow(n){var r=P.res[n];if(TEST())return !P.submitted||!r?'':'<div class="pctl"><span class="pmark '+(r.ok===r.of?'ok':'bad')+'">'+r.ok+' / '+r.of+' correct</span></div>'+(r.notes.length?'<ul class="pnotes">'+r.notes.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'');return '<div class="pctl"><button class="btn pri" type="button" data-check="'+n+'">Check</button><button class="btn line" type="button" data-show="'+n+'">Show answer</button>'+(r?'<span class="pmark '+(r.ok===r.of?'ok':'bad')+'">'+r.ok+' / '+r.of+' correct</span>':'')+'</div>'+(r&&r.notes.length?'<ul class="pnotes">'+r.notes.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'')}
+function itemsText(I){return Core.stateInfo(s,I.id).items.map(function(l){return l.text}).join('\n')}
+function practiceSheet(){
+  var g=s.g,t=s.an.table,cols=t.terminals.concat(t.nonTerminals),h='<div class="head"><h1>SLR(1) parsing · '+(TEST()?'test':'practice')+'</h1><p class="g">'+esc(g.productions.slice(1).map(function(p){return SLR.prodStr(p)}).join('    '))+'</p><p>'+(TEST()?'Solve the whole problem, then press Submit test at the bottom. Nothing is marked until you submit. The stopwatch only records how long you take; there is no time limit.':'Solve the whole problem yourself. Check each part when you are ready; wrong entries are marked with the reason.')+'</p></div>';
+  if(TEST()&&P.submitted)h+=resultCard();
+  if(TEST()&&!P.begun)h+='<div class="tbegin"><p>Read the grammar and input above. The answer boxes stay locked until you begin; the stopwatch starts when you press Begin.</p><button class="btn pri" type="button" id="tbegin">Begin test</button></div>';
+  h+='<h2 class="q">1. Augmented grammar <small>write the new production (0)</small></h2><div class="qb">(0) '+inp('p-aug',220,"S' -> S")+ctlRow(1)+'</div>';
+  h+='<h2 class="q">2. FIRST and FOLLOW <small>symbols separated by commas, eps for ε</small></h2><div class="qb"><table class="w"><tr><th></th><th>FIRST</th><th>FOLLOW</th></tr>'+g.nonTerminals.slice(1).map(function(A){return '<tr><th>'+esc(A)+'</th><td>'+inp('p-fi-'+A,200,'{ … }')+'</td><td>'+inp('p-fo-'+A,200,'{ … }')+'</td></tr>'}).join('')+'</table>'+ctlRow(2)+'</div>';
+  h+='<h2 class="q">3. Canonical collection of LR(0) items <small>one item per line, dot as . e.g. E -> E . + T</small></h2><div class="qb"><div class="states">';
+  for(var i=0;i<P.nStates;i++){var r=P.res.cells&&P.res.cells['p-st-'+i];h+='<div class="box'+(r===true?' good':r===false?' wrong':'')+'"><b>I'+i+'</b><textarea class="pta" id="p-st-'+i+'" rows="5" spellcheck="false"'+(locked()?' readonly':'')+'>'+esc(P.v['p-st-'+i]||'')+'</textarea></div>'}
+  h+='</div>'+(locked()?'':'<div class="pctl"><button class="btn line" type="button" id="addst">+ Add state</button>'+(P.nStates>1?'<button class="btn line" type="button" id="delst">− Remove last</button>':'')+'</div>')+ctlRow(3)+'</div>';
+  h+='<h2 class="q">4. SLR(1) parsing table <small>sN, rN, acc, a state number, or leave empty. Uses the standard numbering I0…I'+(s.an.lr0.states.length-1)+'</small></h2><div class="qb scroll"><table class="w c"><tr><th>state</th>'+cols.map(function(c){return '<th style="text-align:center">'+esc(c)+'</th>'}).join('')+'</tr>'+
+    s.an.lr0.states.map(function(I){return '<tr><th>'+I.id+'</th>'+cols.map(function(c){return '<td>'+inp('p-t-'+I.id+'-'+cols.indexOf(c),52)+'</td>'}).join('')+'</tr>'}).join('')+'</table>'+ctlRow(4)+'</div>';
+  h+='<h2 class="q">5. Is the grammar SLR(1)?</h2><div class="qb">'+inp('p-slr',120,'yes / no')+ctlRow(5)+'</div>';
+  h+='<h2 class="q">6. Parse the input'+(s.tokens?' <span style="font-family:Cousine">'+esc(s.tokens.join(' '))+' $</span>':'')+' <small>stack like 0 a 3, action sN / rN / acc</small></h2><div class="qb">';
+  if(!s.sim)h+='<p class="err">'+esc(s.tokenError||'No input string.')+'</p>';
+  else{h+='<table class="w"><tr><th>#</th><th>Stack</th><th>Input</th><th>Action</th></tr>';for(var k=0;k<P.nRows;k++)h+='<tr><td>'+(k+1)+'</td><td>'+inp('p-ps-'+k,220)+'</td><td>'+inp('p-pi-'+k,140)+'</td><td>'+inp('p-pa-'+k,90)+'</td></tr>';
+    h+='</table>'+(locked()?'':'<div class="pctl"><button class="btn line" type="button" id="addrow">+ Add row</button>'+(P.nRows>1?'<button class="btn line" type="button" id="delrow">− Remove last</button>':'')+'</div>')+ctlRow(6)}
+  var tot=0,ok=0;[1,2,3,4,5,6].forEach(function(n){if(P.res[n]){tot+=P.res[n].of;ok+=P.res[n].ok}});
+  if(TEST())return h+'</div>'+(!P.begun?'':P.submitted?'<div class="tsubmit"><p>Submitted. Time taken '+fmt(P.time)+'. The full worked solution is in Teach mode.</p><button class="btn pri" type="button" id="tretake">Retake test</button></div>':'<div class="tsubmit"><p>Done? Submitting marks every part and stops the stopwatch. You cannot change answers afterwards.</p><button class="btn pri" type="button" id="tsubmit">Submit test</button></div>');
+  return h+'</div>'+(tot?'<p class="ptotal">Total so far: '+ok+' / '+tot+'</p>':'');
+}
+/* ---------- test mode: stopwatch, submit, result ----------
+   P.acc is the time already counted, P.t0 when the running stretch began (0 = paused). */
+var NAMES=['','Augmented grammar','FIRST and FOLLOW','LR(0) item sets','Parsing table','SLR(1)?','Parse moves'];
+function elapsed(){return P.acc+(P.t0?Date.now()-P.t0:0)}
+function fmt(ms){var t=Math.floor(ms/1000),hh=Math.floor(t/3600),mm=Math.floor(t/60)%60,ss=t%60,p=function(x){return (x<10?'0':'')+x};return (hh?hh+':'+p(mm):p(mm))+':'+p(ss)}
+function startClock(){if(!P.submitted&&!P.t0)P.t0=Date.now()}
+function pauseClock(){if(P.t0){P.acc+=Date.now()-P.t0;P.t0=0}}
+function tick(){var c=$('#clock');if(c&&TEST()){c.textContent=fmt(P.submitted?P.time:elapsed());c.classList.toggle('paused',!P.t0&&!P.submitted)}}
+setInterval(tick,500);
+function submitTest(){
+  if(!confirm('Submit the test? Every part will be marked and you cannot change your answers afterwards.'))return;
+  P.time=elapsed();pauseClock();P.submitted=true;P.res={};
+  [1,2,3,4,5,6].forEach(function(n){if(n<6||s.sim)check(n,false)});
+  var ok=0,of=0;[1,2,3,4,5,6].forEach(function(n){if(P.res[n]){ok+=P.res[n].ok;of+=P.res[n].of}});
+  P.score={ok:ok,of:of};render();scrollTo(0,0);
+}
+function resultCard(){var sc=P.score,pct=sc.of?Math.round(100*sc.ok/sc.of):0;
+  return '<div class="tresult"><h2>Test result</h2><span class="big">'+sc.ok+' / '+sc.of+'</span><span class="big">'+pct+'%</span><span class="big">⏱ '+fmt(P.time)+'</span>'+
+    '<table>'+[1,2,3,4,5,6].filter(function(n){return P.res[n]}).map(function(n){var r=P.res[n];return '<tr><td>'+n+'. '+NAMES[n]+'</td><td class="pmark '+(r.ok===r.of?'ok':'bad')+'">'+r.ok+' / '+r.of+'</td></tr>'}).join('')+'</table></div>'}
+function isDark(){var cur=document.documentElement.getAttribute('data-theme');return cur?cur==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
+function themeIcon(){$('#theme').textContent=isDark()?'☀ Light':'☾ Dark'}
+themeIcon();matchMedia('(prefers-color-scheme: dark)').addEventListener('change',themeIcon);
+function mark(id,ok){P.res.cells=P.res.cells||{};P.res.cells[id]=ok;return ok}
+function check(n,reveal){
+  var g=s.g,t=s.an.table,cols=t.terminals.concat(t.nonTerminals),ok=0,of=0,notes=[];
+  function one(id,good,want,why){of++;if(reveal){P.v[id]=want;mark(id,true);ok++;return}if(mark(id,good))ok++;else notes.push(why)}
+  if(n===1){var want=g.augmentedStart+' -> '+g.start;one('p-aug',norm(val('p-aug'))===norm(want),want,'(0) should be '+SLR.prodStr(g.productions[0])+': a new start symbol that derives the old one.')}
+  if(n===2)g.nonTerminals.slice(1).forEach(function(A){['fi','fo'].forEach(function(k){var set=k==='fi'?s.an.ff.first[A]:s.an.ff.follow[A],keys=Object.keys(set),id='p-'+k+'-'+A,good=setOf(val(id))===keys.slice().sort().join(',');
+    one(id,good,'{ '+keys.map(function(x){return x==='ε'?'eps':x}).join(', ')+' }',(k==='fi'?'FIRST(':'FOLLOW(')+A+') = { '+keys.join(', ')+' }. '+keys.map(function(x){return x+': '+set[x].reason}).join('. ')+'.')})});
+  if(n===3){var states=s.an.lr0.states,want3=states.map(function(I){return Core.stateInfo(s,I.id).items.map(function(l){return norm(l.text)}).sort().join('|')});
+    if(reveal){P.nStates=states.length;states.forEach(function(I,i){P.v['p-st-'+i]=itemsText(I);mark('p-st-'+i,true)});ok=of=states.length}
+    else{var used={};for(var i=0;i<P.nStates;i++){var mine=val('p-st-'+i).split('\n').map(norm).filter(Boolean).sort().join('|'),hit=want3.indexOf(mine);of++;
+        if(hit>=0&&!used[hit]){used[hit]=1;ok++;mark('p-st-'+i,true)}else{mark('p-st-'+i,false);notes.push('Your I'+i+(hit>=0?' repeats a state you already have.':' does not match any state. Check the closure: every item with the dot before a non-terminal brings in that non-terminal\'s productions.'))}}
+      var missing=states.length-Object.keys(used).length;if(missing>0){of+=missing;notes.push(missing+' state(s) still missing. There are '+states.length+' states in total.')}}}
+  if(n===4)states4();
+  function states4(){s.an.lr0.states.forEach(function(I){cols.forEach(function(c,ci){var id='p-t-'+I.id+'-'+ci,w=SLR.cellText(t,I.id,c),got=Practice.normalizeCell(val(id)),exp=Practice.normalizeCell(w),good=got!==null&&got.join('/')===exp.join('/');
+    if(!w&&!val(id)&&!reveal)return;/* empty cells left empty are not counted */
+    var why=(t.nonTerminals.indexOf(c)>=0?'GOTO':'ACTION')+'['+I.id+', '+c+'] = '+(w||'blank')+'. '+(Core.cellInfo(s,I.id,c).entries.map(function(e){return e.reason}).join(' ')||Core.cellInfo(s,I.id,c).blank);
+    one(id,good,w,why)})})}
+  if(n===5){var c=Core.conflicts(s);one('p-slr',/^[yn]/i.test(val('p-slr'))&&(/^y/i.test(val('p-slr'))===c.isSLR),c.isSLR?'yes':'no',c.isSLR?'Yes: no cell got two entries.':'No: '+c.list.map(function(x){return x.type+' in I'+x.state+' on '+x.sym}).join('; ')+'.')}
+  if(n===6&&s.sim){var rows=s.sim.steps;if(reveal)P.nRows=rows.length;
+    rows.forEach(function(st,k){if(k>=P.nRows)return;var tr=Core.traceRows(s)[k],act=st.type==='accept'?'acc':st.type==='error'?'err':st.action;
+      one('p-ps-'+k,norm(val('p-ps-'+k))===norm(tr.stack),tr.stack,'Row '+(k+1)+' stack is '+tr.stack+'.');
+      one('p-pi-'+k,norm(val('p-pi-'+k)).replace(/\$$/,'')===norm(tr.input).replace(/\$$/,''),tr.input,'Row '+(k+1)+' remaining input is '+tr.input+'.');
+      one('p-pa-'+k,Practice.normalizeEntry(val('p-pa-'+k))===Practice.normalizeEntry(act),act,'Row '+(k+1)+': '+st.reason+'.')});
+    if(!reveal&&P.nRows<rows.length){of+=rows.length-P.nRows;notes.push('The parse takes '+rows.length+' moves; you have '+P.nRows+' rows.')}
+    if(P.nRows>rows.length)notes.push('The parse ends after '+rows.length+' moves; extra rows are not needed.')}
+  P.res[n]={ok:ok,of:of,notes:notes.slice(0,12)};
+}
+/* ---------- chrome ---------- */
+function render(){
+  if(!s)return;
+  var t=M.mode==='teach',n=STEPS.length;
+  if(t)$('#ctl').innerHTML='<button class="btn" id="first" type="button">⏮</button> <button class="btn" id="prev" type="button">◀ Back</button> <span class="cnt">Step '+(M.k+1)+' of '+n+'</span> <button class="btn pri" id="next" type="button">Next step ▶</button>';
+  else if(TEST())$('#ctl').innerHTML='<span class="clock" id="clock" title="Time taken">'+fmt(P.submitted?P.time:elapsed())+'</span>'+(P.begun&&!P.submitted?' <button class="btn" id="tpause" type="button">'+(P.t0?'Pause':'Resume')+'</button>':'')+(P.begun?' <button class="btn" id="tretake" type="button">Restart test</button>':'');
+  else $('#ctl').innerHTML='<button class="btn" id="restart" type="button">Clear my answers</button>';
+  if(t){$('#first').disabled=$('#prev').disabled=M.k===0;$('#next').disabled=M.k===n-1}
+  var y=scrollY;$('#sheet').innerHTML=t?sheet():practiceSheet();$('#pbar').hidden=true;
+  if(!t){scrollTo(0,y);return}
+  var c=document.querySelector('.sheet .cur');if(c)c.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function go(k){M.k=Math.max(0,Math.min(STEPS.length-1,k));render()}
+document.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.mode){M.mode=b.dataset.mode;P=PS[M.mode]||P;document.querySelectorAll('.seg button').forEach(function(x){x.classList.toggle('on',x===b)});render();scrollTo(0,0);return}
+  if(b.id==='next')go(M.k+1);if(b.id==='prev')go(M.k-1);if(b.id==='first')go(0);
+  if(b.dataset.check){check(+b.dataset.check,false);render()}
+  if(b.dataset.show){check(+b.dataset.show,true);render()}
+  if(b.id==='addst'){P.nStates++;render()}if(b.id==='delst'){P.nStates--;render()}
+  if(b.id==='addrow'){P.nRows++;render()}if(b.id==='delrow'){P.nRows--;render()}
+  if(b.id==='clear'){editor.setCfg({grammar:'',input:'',spaceOnly:false});var f=document.querySelector('.pe-lhs');if(f)f.focus();return}
+  if(b.id==='edit'){$('#inputs').classList.remove('collapsed');$('#inputs').scrollIntoView({behavior:'smooth'})}
+  if(b.id==='pnext'){if(M.k===STEPS.length-1){$('#fb')&&($('#fb').innerHTML='Finished. Score '+M.score+' of '+STEPS.filter(function(x){return question(x)}).length+' (first-try answers).');return}M.answered[M.k]=true;go(M.k+1)}
+  if(b.id==='show')answer('',true);
+  if(b.id==='restart'){P.v={};P.res={};P.nStates=1;P.nRows=1;render()}
+  if(b.id==='tsubmit')submitTest();
+  if(b.id==='tbegin'){P.begun=true;startClock();render();var fi=document.getElementById('p-aug');if(fi)fi.focus()}
+  if(b.id==='tpause'){if(P.t0)pauseClock();else startClock();render()}
+  if(b.id==='tretake'&&(P.submitted||confirm('Restart the test? Your answers and the stopwatch are cleared.'))){P=PS.test=freshP();render();scrollTo(0,0)}
+  if(b.id==='theme'){var nx=isDark()?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('slr.theme',nx)}catch(err){}themeIcon()}});
+document.addEventListener('input',function(e){if(e.target.id&&e.target.id.indexOf('p-')===0){if(locked()){e.target.value=P.v[e.target.id]||'';return}P.v[e.target.id]=e.target.value;if(TEST()&&!P.t0&&!P.submitted){startClock();var tp=$('#tpause');if(tp)tp.textContent='Pause'}}});
+document.addEventListener('submit',function(e){if(e.target.id==='pform'){e.preventDefault();answer($('#pans').value,false)}});
+document.addEventListener('keydown',function(e){if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||M.mode!=='teach'||!s)return;if(e.key==='ArrowRight')go(M.k+1);if(e.key==='ArrowLeft')go(M.k-1)});
+var cfg=Core.initial();editor.setCfg(cfg);build(cfg);
+})();
+</script></body></html>

@@ -1,0 +1,2309 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SLR(1) Parser · Step by Step</title>
+<meta name="description" content="Enter a grammar and an input string; the SLR(1) parser is built and run one step at a time. Practice mode makes you do each step yourself.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='3' width='20' height='26' fill='%23fff' stroke='%230f7c80' stroke-width='1.8'/%3E%3Cpath d='M10 11h12M10 16h12M10 21h8' stroke='%232d4ea6' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Caveat:wght@500;700&family=Cousine:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;--gold:#b86e00;--desk:#ececec;--paper:#fff;--print:#1d1d1d;--muted:#6b6b6b;--rule:#c9c9c9;--ink:#222222;--red:#c62d2d;--teal:#111111;--teal-d:#111111;--teal-w:#f0f0f0;--ok:#2f8a4a;
+  --on-teal:#fff;--head:#f4f4f4;--shadow:#c4c0b8;--good-bg:#e9f5ec;--bad-bg:#fbe9e9;--good-box:#f2faf4;--bad-box:#fdf3f3;--line:#eee;--warn:#9a5b00;--bar:#111111}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--gold:#ffb020;--desk:#121212;--paper:#1d1d1f;--print:#e8e8e8;--muted:#a3a3a3;--rule:#46464a;--ink:#f2f2f2;--red:#ff7070;--teal:#e8e8e8;--teal-d:#f2f2f2;--teal-w:#2c2c30;--ok:#5fcf7f;
+  --on-teal:#111;--head:#28282b;--shadow:#000;--good-bg:#173a22;--bad-bg:#43191b;--good-box:#152a1c;--bad-box:#311719;--line:#2e2e32;--warn:#e7a948;--bar:#000}}
+:root[data-theme="dark"]{color-scheme:dark;--gold:#ffb020;--desk:#121212;--paper:#1d1d1f;--print:#e8e8e8;--muted:#a3a3a3;--rule:#46464a;--ink:#f2f2f2;--red:#ff7070;--teal:#e8e8e8;--teal-d:#f2f2f2;--teal-w:#2c2c30;--ok:#5fcf7f;
+  --on-teal:#111;--head:#28282b;--shadow:#000;--good-bg:#173a22;--bad-bg:#43191b;--good-box:#152a1c;--bad-box:#311719;--line:#2e2e32;--warn:#e7a948;--bar:#000}
+
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--desk);color:var(--print);font:15px/1.55 "Lora",Georgia,serif}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 18px;background:var(--bar);color:#e3eef0;font:600 14px system-ui,sans-serif}
+.bar b{font-size:16px;margin-right:6px}
+.bar .sp{flex:1}
+.seg{display:flex;background:rgba(255,255,255,.12);border-radius:7px;padding:2px}
+.seg button{border:0;background:none;color:#cfe3e5;padding:6px 14px;border-radius:6px}
+.seg button.on{background:#fff;color:#111}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.btn{border:0;background:var(--paper);color:var(--print);border-radius:6px;padding:7px 14px;font:600 14px system-ui,sans-serif}
+.btn.pri{background:var(--teal);color:var(--on-teal)}
+.bar .btn{background:#fff;color:#111}
+.bar .btn.pri{background:#fff;color:#111}
+.btn:disabled{opacity:.4;cursor:default}
+.cnt{min-width:120px;text-align:center;color:#cfe3e5;font-weight:400}
+.sheet{width:min(920px,96vw);margin:22px auto 30px;background:var(--paper);box-shadow:0 2px 0 var(--shadow),0 20px 40px -20px rgba(0,0,0,.45);padding:40px 56px 56px;position:relative}
+/* grammar input card */
+.inputs{width:min(920px,96vw);margin:22px auto 0;background:var(--paper);border-top:4px solid var(--teal);box-shadow:0 2px 0 var(--shadow);padding:22px 30px 24px}
+.inputs h2{margin:0 0 4px;font:700 18px "Lora"}.inputs>p{margin:0 0 14px;color:var(--muted);font-size:14px}
+.inputs.collapsed #editor{display:none}
+.summary{display:none;font:15px "Cousine";color:var(--print)}
+.inputs.collapsed .summary{display:block}
+.pe-top{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.pe-label{display:block;font:600 13px system-ui,sans-serif;color:var(--muted);margin-bottom:4px}
+.pe-stepper{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.pe-stepper button{width:34px;border:0;background:var(--teal-w);font-size:17px;color:var(--teal-d)}
+.pe-stepper input{width:56px;background:transparent;border:0;border-left:1px solid var(--rule);border-right:1px solid var(--rule);text-align:center;font:600 16px "Cousine";-moz-appearance:textfield}
+.pe-stepper input::-webkit-inner-spin-button{-webkit-appearance:none}
+.pe-off{opacity:.35;pointer-events:none}
+.pe-tools{display:flex;gap:8px}
+.pe-tools select,.pe-mode{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:6px 10px;font:14px system-ui,sans-serif}
+.pe-rows{list-style:none;margin:0 0 12px;padding:0;border-top:1px solid var(--rule)}
+.pe-row{display:grid;grid-template-columns:44px 100px 30px minmax(0,1fr) 38px 34px;align-items:center;border-bottom:1px solid var(--rule);min-height:42px}
+.pe-n{color:var(--muted);font:14px "Cousine"}
+.pe-row input{border:0;background:none;font:17px "Cousine";padding:6px 4px;min-width:0}
+.pe-row input:focus{outline:none;box-shadow:inset 0 -2px 0 var(--teal)}
+.pe-lhs{font-weight:700!important}
+.pe-arrow{text-align:center;color:var(--muted)}
+.pe-eps,.pe-del{border:0;background:none;color:var(--muted);font-size:16px;height:32px;border-radius:4px}
+.pe-eps:hover,.pe-del:hover:not(:disabled){background:var(--teal-w);color:var(--teal-d)}
+.pe-del:disabled{opacity:.25}
+.pe-note{grid-column:4/-1;margin:-6px 0 6px;font:13px system-ui,sans-serif;color:var(--muted)}
+.pe-note-err{color:var(--red)}.pe-bad .pe-n{color:var(--red)}
+.pe-text{width:100%;border:1px solid var(--rule);background:var(--paper);font:16px/1.6 "Cousine";padding:10px;margin-bottom:6px}
+.pe-hint{font-size:13px;color:var(--muted);margin:0 0 10px}
+.pe-meta{display:grid;grid-template-columns:180px 1fr;gap:16px;margin-bottom:12px}
+.pe-start{border:1px solid var(--rule);border-radius:6px;font:15px "Cousine";padding:4px 8px;background:var(--paper);min-width:80px}
+.pe-syms>div{margin-bottom:4px}.pe-syms .pe-label{display:inline-block;width:110px;margin:0}
+.pe-chip{font:15px "Cousine";margin-right:10px}.pe-nt{color:var(--teal-d);font-weight:700}
+.pe-warn{font:13px system-ui,sans-serif;color:var(--warn);margin:4px 0 0}
+.pe-input{margin-bottom:10px}
+.pe-w{width:100%;border:0;border-bottom:2px solid var(--print);font:20px "Cousine";padding:6px 2px;background:none}
+.pe-w:focus{outline:none;border-bottom-color:var(--teal)}
+.pe-keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pe-key{border:1px solid var(--rule);background:var(--paper);border-radius:6px;font:15px "Cousine";padding:3px 12px;min-height:34px}
+.pe-key:hover{border-color:var(--teal)}
+.pe-space{display:flex;gap:8px;align-items:center;font:13px system-ui,sans-serif;color:var(--muted);margin-bottom:12px}
+.pe-error{color:var(--red);font:14px system-ui,sans-serif;border-left:3px solid var(--red);padding:4px 10px;margin:0 0 12px}
+.pe-build{border:0;background:var(--teal);color:var(--on-teal);border-radius:6px;padding:10px 22px;font:600 15px system-ui,sans-serif}
+/* worksheet */
+.head{border-bottom:2px solid var(--print);padding-bottom:10px;margin-bottom:18px}
+.head h1{font:700 22px/1.2 "Lora";margin:0}.head p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.head .g{font:15px "Cousine";color:var(--print)}
+h2.q{font:700 17px "Lora";margin:26px 0 8px}h2.q small{font-weight:400;color:var(--muted);font-size:13.5px;margin-left:6px}
+.qb{position:relative}
+.prod{font:15px "Cousine";margin:2px 0}
+.ink{font:700 23px/1 "Caveat",cursive;color:var(--ink)}
+.write{display:inline-block;animation:write .7s steps(14) both;clip-path:inset(0 100% 0 0)}
+@keyframes write{to{clip-path:inset(0 0 0 0)}}
+.ask{display:inline-block;min-width:34px;text-align:center;border:2px dashed var(--teal);border-radius:4px;color:var(--teal);font:700 18px "Cousine";padding:0 6px;background:var(--paper)}
+.blank{display:inline-block;min-width:90px;border-bottom:1px solid var(--print);min-height:24px;vertical-align:bottom;padding:0 4px}
+table.w{border-collapse:collapse;margin:6px 0}
+table.w th,table.w td{border:1px solid var(--print);padding:3px 10px;height:34px;text-align:left;vertical-align:middle}
+table.w th{font:600 13.5px "Lora";background:var(--head)}
+table.w.c td{text-align:center;padding:2px 4px;min-width:46px}
+table.w td.conf .ink{color:var(--red)}
+.scroll{overflow-x:auto}
+.states{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid var(--print);min-height:96px;padding:4px 8px 6px}
+.box b{font:700 14px "Lora"}
+.box .ink{font-size:19px;line-height:1.15;display:block}
+.trans{font:14px "Cousine";color:var(--muted);margin-top:6px}
+.note{position:absolute;right:-210px;width:190px;font:600 19px/1.15 "Caveat";color:var(--red);transform:rotate(-2deg)}
+.note::before{content:"";position:absolute;left:-26px;top:10px;width:22px;border-top:2px solid var(--red)}
+.cur{background:var(--teal-w)}
+.err{color:var(--red);font:15px system-ui,sans-serif}
+/* practice bar */
+.pbar{position:sticky;bottom:0;z-index:5;background:var(--paper);border-top:3px solid var(--teal);box-shadow:0 -8px 24px -12px rgba(0,0,0,.3);padding:14px 18px}
+.pbar-in{width:min(920px,96vw);margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
+.pbar .qtext{font:600 16px "Lora"}.pbar .qtext small{display:block;font:13px system-ui,sans-serif;color:var(--muted)}
+.pbar form{display:flex;gap:8px;align-items:center}
+.pbar input{width:170px;border:0;border-bottom:2px solid var(--print);font:700 24px "Caveat";color:var(--ink);background:none;padding:2px 4px}
+.pbar input:focus{outline:none;border-bottom-color:var(--teal)}
+.fb{grid-column:1/3;font:15px system-ui,sans-serif;min-height:22px}
+.fb.ok{color:var(--ok)}.fb.bad{color:var(--red)}
+.fb .why{color:var(--muted)}
+.tally{font:600 14px system-ui,sans-serif;color:#cfe3e5}
+.pin{border:0;border-bottom:1.5px solid var(--rule);background:transparent;font:700 21px/1.2 "Caveat",cursive;color:var(--ink);padding:2px 4px;max-width:100%}
+.pin:focus{outline:none;border-bottom-color:var(--teal)}
+.pin.good{background:var(--good-bg);border-bottom-color:var(--ok)}.pin.wrong{background:var(--bad-bg);border-bottom-color:var(--red)}
+.pta{width:100%;border:0;resize:vertical;font:700 19px/1.2 "Caveat",cursive;color:var(--ink);background:repeating-linear-gradient(transparent 0 22px,var(--line) 22px 23px);outline:none;margin-top:4px}
+.box.good{border-color:var(--ok);background:var(--good-box)}.box.wrong{border-color:var(--red);background:var(--bad-box)}
+.pctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.btn.line{border:1px solid var(--rule)}
+.bar .btn.line{border-color:transparent}
+.pmark{font:600 14px system-ui,sans-serif}.pmark.ok{color:var(--ok)}.pmark.todo{color:var(--muted)}.pmark.bad{color:var(--red)}
+.pnotes{margin:8px 0 0;padding-left:20px;font:600 19px/1.2 "Caveat";color:var(--red)}
+.pnotes li{margin-bottom:4px}
+.ptotal{margin-top:24px;font:700 17px "Lora";border-top:2px solid var(--print);padding-top:10px}
+/* test mode */
+.clock{font:700 18px "Cousine";color:#fff;letter-spacing:.5px;min-width:92px;text-align:center}
+.clock.paused{color:#9a9a9a}
+.tsubmit{margin-top:30px;border-top:2px solid var(--print);padding-top:16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.tsubmit p{margin:0;color:var(--muted);font-size:14px;flex:1;min-width:220px}
+.tresult{border:2px solid var(--print);padding:14px 18px;margin:0 0 20px}
+.tresult h2{margin:0 0 6px;font:700 19px "Lora"}
+.printonly{display:none}
+.tresult .best{margin:10px 0 0;font-weight:600}
+.tresult .best,.tresult .big.new{color:var(--gold)}
+.tresult .best.new{font-size:17px}
+.tresult .big{font:700 30px "Cousine";margin-right:22px}
+.tresult table{border-collapse:collapse;margin-top:10px;font-size:14px}
+.tresult td{padding:2px 14px 2px 0}
+.pin[readonly],.pta[readonly]{cursor:not-allowed}
+/* peek: a wrong answer's correct entry under spoiler specks (js/spoiler.js) */
+.spoil{position:relative;display:inline-block;min-width:38px;padding:1px 6px;margin-left:6px;border-radius:3px;background:var(--teal-w);color:var(--print);font:13px/1.4 "Cousine";text-align:center;vertical-align:middle;cursor:pointer;white-space:nowrap}
+.spoil:hover:not(.open){background:var(--rule)}
+.spoil .spoil-t{opacity:0;filter:blur(6px);user-select:none;transition:opacity .45s cubic-bezier(.23,1,.32,1),filter .45s cubic-bezier(.23,1,.32,1)}
+.spoil.open{cursor:default;background:none;color:var(--muted)}
+.spoil.open .spoil-t{opacity:1;filter:none;user-select:auto}
+.spoil-c{position:absolute;left:0;top:0;pointer-events:none}
+td .spoil{display:block;margin:3px auto 0;width:max-content}
+@media (prefers-reduced-motion:reduce){.spoil .spoil-t{transition:opacity .2s}}
+.tbegin{border:2px dashed var(--teal);padding:14px 18px;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.tbegin p{margin:0;flex:1;min-width:220px;font-size:14px;color:var(--muted)}
+@media (max-width:1300px){.note{position:static;display:block;width:auto;transform:none;margin:4px 0 0}.note::before{display:none}}
+@media (max-width:700px){.sheet,.inputs{padding:22px 16px}.states{grid-template-columns:repeat(2,1fr)}.pe-row{grid-template-columns:34px 70px 22px minmax(0,1fr) 32px 30px}.pe-meta{grid-template-columns:1fr}.pbar-in{grid-template-columns:1fr}}
+@media print{.bar,.inputs,.pbar,.noprint,.tsubmit button{display:none}.tresult{break-inside:avoid}.printonly{display:block}.solution{break-before:page}.solution .note{display:none}.write{animation:none;clip-path:none}body{background:#fff}.sheet{box-shadow:none;margin:0;width:auto}}
+@media (prefers-reduced-motion:reduce){.write{animation:none;clip-path:none}}
+body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar{top:env(safe-area-inset-top,0px);margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)))}
+.sheet,.inputs{width:min(920px,100%)}
+</style></head>
+<body>
+<script>try{var t=localStorage.getItem('slr.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<div class="bar"><b>SLR(1) Parser</b><div class="seg"><button type="button" class="on" data-mode="teach">Teach</button><button type="button" data-mode="practice">Practice</button><button type="button" data-mode="test">Test</button></div><button type="button" class="btn line" id="theme" aria-label="Switch light or dark theme" title="Light / dark"></button><span class="sp"></span><span id="ctl"></span></div>
+
+<section class="inputs" id="inputs">
+  <h2>Grammar and input</h2>
+  <p>Fill one production per row (a new row appears as you type), then type the input string to parse (for example <span style="font-family:Cousine">aacb</span>). Or load an example.</p>
+  <div class="summary" id="summary"></div>
+  <div style="display:flex;gap:8px;margin:0 0 10px"><button type="button" class="btn line" id="clear">Clear grammar</button></div>
+  <div id="editor"></div>
+</section>
+
+<main class="sheet" id="sheet"></main>
+<div class="pbar" id="pbar" hidden><div class="pbar-in" id="pbar-in"></div></div>
+
+<script>
+/*
+ * grammar.js — reads a context-free grammar typed by the user.
+ *
+ * Accepted notation (the same forms used in the lecture notes):
+ *   E -> E + T | T        arrows: ->  -->  →  ::=
+ *   A -> aA | b           compact form: symbols written without spaces
+ *   A -> ε                epsilon: ε  eps  epsilon  #  λ  or an empty alternative
+ *   S -> 'if' C 'then' S  quotes force a multi-character terminal
+ *
+ * Non-terminals are exactly the symbols that appear on a left-hand side.
+ * Everything else on a right-hand side is a terminal.
+ */
+(function (root) {
+  'use strict';
+
+  var EPS_WORDS = ['ε', 'eps', 'epsilon', '#', 'λ', 'Λ', "''"];
+  // Multi-character terminals recognised inside compact alternatives such as "id+id".
+  var WORD_TERMINALS = ['id', 'num', 'number', 'digit', 'int', 'float', 'char', 'string', 'literal'];
+  var ARROW = /\s*(?:-->|->|→|::=)\s*/;
+
+  /*
+   * Clean notation copied from PDFs and slides before reading it:
+   *   full-width / subscript characters (NFKC), curly or typographic primes,
+   *   arrow variants ⟶ ⇒ ⟹ ➝ =>, and ε look-alikes ϵ ∈ Є.
+   */
+  function normalize(text) {
+    var t = String(text);
+    if (t.normalize) t = t.normalize('NFKC');
+    return t
+      .replace(/[\u2018\u2019\u2032\u02B9\u00B4`]/g, "'")
+      .replace(/\u2033/g, "''")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/\s*(?:\u27F6|\u21D2|\u27F9|\u279D|\u279E|\u2192|=>)\s*/g, ' -> ')
+      .replace(/[\u03F5\u2208\u0404]/g, 'ε')
+      .replace(/[\u2013\u2014]>/g, '->')
+      .replace(/\u00A0/g, ' ');
+  }
+
+  function GrammarError(message, line) {
+    this.name = 'GrammarError';
+    this.message = message;
+    this.line = line;
+  }
+  GrammarError.prototype = Object.create(Error.prototype);
+
+  /* Split a chunk like "aA" or "E'+T" into symbols using greedy longest match. */
+  function splitCompact(chunk, known) {
+    var out = [];
+    var i = 0;
+    while (i < chunk.length) {
+      if (chunk[i] === "'" && chunk.indexOf("'", i + 1) > i + 1) {
+        var end = chunk.indexOf("'", i + 1);
+        out.push(chunk.slice(i + 1, end));
+        i = end + 1;
+        continue;
+      }
+      var best = '';
+      for (var k = 0; k < known.length; k++) {
+        var s = known[k];
+        if (s.length > best.length && chunk.substr(i, s.length) === s) best = s;
+      }
+      if (!best) best = chunk[i];
+      out.push(best);
+      i += best.length;
+    }
+    return out;
+  }
+
+  function tokenizeAlternative(text, known, spaceOnly, splits, line) {
+    var t = text.trim();
+    if (t === '' || EPS_WORDS.indexOf(t) >= 0) return [];
+    var chunks = t.split(/\s+/);
+    var syms = [];
+    chunks.forEach(function (c) {
+      if (EPS_WORDS.indexOf(c) >= 0) return;
+      if (/^'.+'$/.test(c)) { syms.push(c.slice(1, -1)); return; }
+      if (spaceOnly || known.indexOf(c) >= 0) { syms.push(c); return; }
+      var parts = splitCompact(c, known);
+      if (parts.length > 1 && splits) splits.push({ text: c, symbols: parts, line: line });
+      parts.forEach(function (s) { syms.push(s); });
+    });
+    return syms;
+  }
+
+  /*
+   * parseGrammar(text, options) -> grammar object
+   *   options.spaceOnly: true = every whitespace-separated word is one symbol
+   */
+  function parseGrammar(text, options) {
+    var spaceOnly = !!(options && options.spaceOnly);
+    var rawRules = [];
+    var lines = normalize(text).split(/\r?\n/);
+    var last = null;
+
+    lines.forEach(function (line, idx) {
+      var clean = line.replace(/\/\/.*$/, '').trim();
+      if (!clean) return;
+      if (ARROW.test(clean)) {
+        var parts = clean.split(ARROW);
+        var lhs = parts[0].trim();
+        if (!lhs || /\s/.test(lhs)) {
+          throw new GrammarError('Line ' + (idx + 1) + ': the left-hand side must be one non-terminal, found "' + lhs + '".', idx + 1);
+        }
+        last = { lhs: lhs, rhs: parts.slice(1).join('->'), line: idx + 1 };
+        rawRules.push(last);
+      } else if (clean[0] === '|' && last) {
+        last.rhs += ' ' + clean;                 // continuation line:  | T
+      } else {
+        throw new GrammarError('Line ' + (idx + 1) + ': expected a rule like  A -> α , found "' + clean + '".', idx + 1);
+      }
+    });
+
+    if (!rawRules.length) throw new GrammarError('The grammar is empty. Enter at least one rule such as  S -> a S | b.', 0);
+
+    var nonTerminals = [];
+    rawRules.forEach(function (r) { if (nonTerminals.indexOf(r.lhs) < 0) nonTerminals.push(r.lhs); });
+
+    var known = nonTerminals.concat(WORD_TERMINALS).sort(function (a, b) { return b.length - a.length; });
+
+    var productions = [];
+    var splits = [];
+    rawRules.forEach(function (r) {
+      r.rhs.split('|').forEach(function (alt) {
+        var rhs = tokenizeAlternative(alt, known, spaceOnly, splits, r.line);
+        var dup = productions.some(function (p) { return p.lhs === r.lhs && p.rhs.join('\u0001') === rhs.join('\u0001'); });
+        if (!dup) productions.push({ lhs: r.lhs, rhs: rhs, line: r.line });
+      });
+    });
+
+    var terminals = [];
+    productions.forEach(function (p) {
+      p.rhs.forEach(function (s) {
+        if (nonTerminals.indexOf(s) < 0 && terminals.indexOf(s) < 0) terminals.push(s);
+      });
+    });
+    if (terminals.indexOf('$') >= 0) throw new GrammarError('"$" is reserved for the end-of-input marker and cannot be used as a terminal.', 0);
+
+    var start = nonTerminals[0];
+    var aug = start + "'";
+    while (nonTerminals.indexOf(aug) >= 0 || terminals.indexOf(aug) >= 0) aug += "'";
+
+    var augmented = [{ lhs: aug, rhs: [start], line: 0 }].concat(productions);
+    augmented.forEach(function (p, i) { p.index = i; });
+
+    var warnings = [];
+    nonTerminals.forEach(function (nt) {
+      var used = nt === start || productions.some(function (p) { return p.rhs.indexOf(nt) >= 0; });
+      if (!used) warnings.push('Non-terminal ' + nt + ' is never used on any right-hand side (unreachable).');
+    });
+
+    return {
+      start: start,
+      augmentedStart: aug,
+      nonTerminals: [aug].concat(nonTerminals),
+      terminals: terminals,
+      productions: augmented,
+      warnings: warnings,
+      splits: splits,
+      mode: spaceOnly ? 'space' : 'auto'
+    };
+  }
+
+  /* Split an input string into grammar terminals (longest match). "id+id*id" -> [id,+,id,*,id] */
+  function tokenizeInput(text, grammar) {
+    var terms = grammar.terminals.slice().sort(function (a, b) { return b.length - a.length; });
+    var out = [];
+    var chunks = normalize(text).trim().split(/\s+/).filter(Boolean);
+    for (var c = 0; c < chunks.length; c++) {
+      var chunk = chunks[c];
+      if (chunk === '$') continue;
+      if (terms.indexOf(chunk) >= 0) { out.push(chunk); continue; }
+      var i = 0;
+      while (i < chunk.length) {
+        var best = '';
+        for (var k = 0; k < terms.length; k++) {
+          if (terms[k].length > best.length && chunk.substr(i, terms[k].length) === terms[k]) best = terms[k];
+        }
+        if (!best) {
+          throw new GrammarError('Input symbol "' + chunk.slice(i) + '" is not a terminal of this grammar. Terminals are: ' + grammar.terminals.join('  '), 0);
+        }
+        out.push(best);
+        i += best.length;
+      }
+    }
+    return out;
+  }
+
+  function productionToString(p) {
+    return p.lhs + ' → ' + (p.rhs.length ? p.rhs.join(' ') : 'ε');
+  }
+
+  var api = {
+    parseGrammar: parseGrammar,
+    tokenizeInput: tokenizeInput,
+    productionToString: productionToString,
+    normalize: normalize,
+    GrammarError: GrammarError
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Grammar = api;
+})(this);
+
+</script><script>
+/*
+ * slr.js — the SLR(1) construction engine.
+ *
+ * Every stage records the steps it took, so the interface can replay the
+ * construction instead of only showing the finished result:
+ *
+ *   computeFirstFollow(g)   FIRST and FOLLOW sets + the reason each symbol was added
+ *   buildLR0(g)             canonical collection of LR(0) items via closure and goto
+ *   buildTable(g, ff, lr0)  ACTION/GOTO table, the fill order, and conflicts
+ *   simulate(g, table, w)   shift-reduce parse of w with stack / input / tree per move
+ *
+ * The module has no DOM dependencies, so it runs unchanged in Node for tests.
+ */
+(function (root) {
+  'use strict';
+
+  var EPS = 'ε';
+  var END = '$';
+
+  function isNT(g, s) { return g.nonTerminals.indexOf(s) >= 0; }
+  function prodStr(p) { return p.lhs + ' → ' + (p.rhs.length ? p.rhs.join(' ') : EPS); }
+
+  /* ------------------------------------------------------------------ */
+  /* FIRST and FOLLOW                                                    */
+  /* ------------------------------------------------------------------ */
+
+  function computeFirstFollow(g) {
+    var first = {}, follow = {}, steps = [];
+    g.nonTerminals.forEach(function (A) { first[A] = {}; follow[A] = {}; });
+
+    function firstOfSymbol(X) {
+      if (!isNT(g, X)) { var t = {}; t[X] = true; return t; }
+      return first[X];
+    }
+
+    /* FIRST of a sequence X1..Xn, and whether the whole sequence can derive ε. */
+    function firstOfSeq(seq) {
+      var out = {}, nullable = true;
+      for (var i = 0; i < seq.length; i++) {
+        var f = firstOfSymbol(seq[i]);
+        Object.keys(f).forEach(function (s) { if (s !== EPS) out[s] = true; });
+        if (!f[EPS]) { nullable = false; break; }
+      }
+      return { set: out, nullable: nullable };
+    }
+
+    function add(kind, table, A, sym, reason, prod, pass) {
+      if (table[A][sym]) return false;
+      table[A][sym] = { reason: reason, prod: prod ? prod.index : null, pass: pass };
+      steps.push({ kind: kind, of: A, sym: sym, reason: reason, prod: prod ? prod.index : null, pass: pass });
+      return true;
+    }
+
+    /* FIRST: apply the three rules to every production until nothing changes. */
+    var changed = true, pass = 0;
+    while (changed) {
+      changed = false; pass++;
+      g.productions.forEach(function (p) {
+        var A = p.lhs;
+        if (p.rhs.length === 0) {
+          if (add('FIRST', first, A, EPS, '(' + p.index + ') ' + prodStr(p) + ' derives ε directly', p, pass)) changed = true;
+          return;
+        }
+        for (var i = 0; i < p.rhs.length; i++) {
+          var X = p.rhs[i];
+          var prefix = i === 0 ? '' : ', since ' + p.rhs.slice(0, i).join(' ') + ' can derive ε';
+          if (!isNT(g, X)) {
+            if (add('FIRST', first, A, X, X + ' begins the right side of (' + p.index + ') ' + prodStr(p) + prefix, p, pass)) changed = true;
+            return;
+          }
+          Object.keys(first[X]).forEach(function (s) {
+            if (s === EPS) return;
+            if (add('FIRST', first, A, s, 'FIRST(' + X + ') ⊆ FIRST(' + A + ') by (' + p.index + ') ' + prodStr(p) + prefix, p, pass)) changed = true;
+          });
+          if (!first[X][EPS]) return;
+        }
+        if (add('FIRST', first, A, EPS, 'every symbol of (' + p.index + ') ' + prodStr(p) + ' can derive ε', p, pass)) changed = true;
+      });
+    }
+    var firstPasses = pass;
+
+    /* FOLLOW rule 1: $ follows the start symbol. */
+    add('FOLLOW', follow, g.augmentedStart, END, '$ is placed in FOLLOW of the start symbol ' + g.augmentedStart, null, 0);
+    changed = true; pass = 0;
+    while (changed) {
+      changed = false; pass++;
+      g.productions.forEach(function (p) {
+        for (var i = 0; i < p.rhs.length; i++) {
+          var B = p.rhs[i];
+          if (!isNT(g, B)) continue;
+          var beta = p.rhs.slice(i + 1);
+          var fb = firstOfSeq(beta);
+          /* Rule 2: A → α B β gives FIRST(β) − {ε} ⊆ FOLLOW(B). */
+          Object.keys(fb.set).forEach(function (s) {
+            var why = (beta.length && !isNT(g, beta[0]) && beta[0] === s)
+              ? s + ' comes right after ' + B + ' in (' + p.index + ') ' + prodStr(p)
+              : 'FIRST(' + beta.join(' ') + ') ⊆ FOLLOW(' + B + ') by (' + p.index + ') ' + prodStr(p);
+            if (add('FOLLOW', follow, B, s, why, p, pass)) changed = true;
+          });
+          /* Rule 3: A → α B, or β ⇒* ε, gives FOLLOW(A) ⊆ FOLLOW(B). */
+          if (fb.nullable && B !== p.lhs) {
+            Object.keys(follow[p.lhs]).forEach(function (s) {
+              var why = 'FOLLOW(' + p.lhs + ') ⊆ FOLLOW(' + B + ') because ' + B +
+                (beta.length ? ' is followed only by symbols that can derive ε' : ' ends the right side') +
+                ' of (' + p.index + ') ' + prodStr(p);
+              if (add('FOLLOW', follow, B, s, why, p, pass)) changed = true;
+            });
+          }
+        }
+      });
+    }
+
+    return { first: first, follow: follow, steps: steps, firstOfSeq: firstOfSeq, passes: { first: firstPasses, follow: pass } };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* LR(0) items: closure, goto, canonical collection                    */
+  /* ------------------------------------------------------------------ */
+
+  /* An item is { p: production index, d: dot position }. */
+  function itemKey(it) { return it.p + '.' + it.d; }
+
+  function itemStr(g, it) {
+    var p = g.productions[it.p];
+    var syms = p.rhs.slice();
+    syms.splice(it.d, 0, '•');
+    return p.lhs + ' → ' + syms.join(' ');
+  }
+
+  function afterDot(g, it) {
+    var p = g.productions[it.p];
+    return it.d < p.rhs.length ? p.rhs[it.d] : null;
+  }
+
+  /* closure(kernel): items in insertion order; each added item records the item that caused it. */
+  function closure(g, kernel) {
+    var items = kernel.map(function (it) { return { p: it.p, d: it.d, kernel: true, from: null }; });
+    var seen = {};
+    items.forEach(function (it) { seen[itemKey(it)] = true; });
+    for (var i = 0; i < items.length; i++) {
+      var B = afterDot(g, items[i]);
+      if (!B || !isNT(g, B)) continue;
+      for (var j = 0; j < g.productions.length; j++) {
+        var p = g.productions[j];
+        if (p.lhs !== B) continue;
+        var k = p.index + '.0';
+        if (seen[k]) continue;
+        seen[k] = true;
+        items.push({ p: p.index, d: 0, kernel: false, from: itemKey(items[i]) });
+      }
+    }
+    return items;
+  }
+
+  /* goto(I, X) kernel: move the dot over X in every item of I that has X after the dot. */
+  function gotoKernel(g, items, X) {
+    var k = [];
+    items.forEach(function (it) {
+      if (afterDot(g, it) === X) k.push({ p: it.p, d: it.d + 1 });
+    });
+    return k;
+  }
+
+  function kernelSig(kernel) { return kernel.map(itemKey).sort().join('|'); }
+
+  /*
+   * States are numbered in discovery order: each state's transitions are explored
+   * in the order their symbols appear after the dot. This reproduces the textbook
+   * numbering (I0..I11 for the expression grammar, I0..I6 for S → AA).
+   */
+  function buildLR0(g) {
+    var states = [], steps = [], bySig = {};
+
+    function makeState(kernel) {
+      var s = { id: states.length, kernel: kernel, items: closure(g, kernel), transitions: [] };
+      states.push(s);
+      bySig[kernelSig(kernel)] = s.id;
+      return s;
+    }
+
+    makeState([{ p: 0, d: 0 }]);
+    steps.push({ type: 'start', state: 0, from: null, sym: null,
+      text: 'I0 = closure({ ' + itemStr(g, { p: 0, d: 0 }) + ' })' });
+
+    for (var i = 0; i < states.length; i++) {
+      var I = states[i];
+      var order = [];
+      I.items.forEach(function (it) {
+        var X = afterDot(g, it);
+        if (X && order.indexOf(X) < 0) order.push(X);
+      });
+      order.forEach(function (X) {
+        var k = gotoKernel(g, I.items, X);
+        var sig = kernelSig(k);
+        var isNew = !bySig.hasOwnProperty(sig);
+        var target = isNew ? makeState(k).id : bySig[sig];
+        I.transitions.push({ sym: X, to: target });
+        steps.push({
+          type: isNew ? 'new' : 'existing', from: I.id, sym: X, state: target,
+          text: 'goto(I' + I.id + ', ' + X + ') = ' + (isNew ? 'new state I' + target : 'I' + target + ', already in the collection')
+        });
+      });
+    }
+    return { states: states, steps: steps };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* SLR(1) ACTION / GOTO table                                          */
+  /* ------------------------------------------------------------------ */
+
+  function entryStr(e) {
+    if (e.type === 's') return 's' + e.to;
+    if (e.type === 'r') return 'r' + e.prod;
+    if (e.type === 'acc') return 'acc';
+    return String(e.to);
+  }
+
+  function buildTable(g, ff, lr0) {
+    var terms = g.terminals.concat([END]);
+    var nts = g.nonTerminals.slice(1); /* GOTO columns leave out the augmented start */
+    var action = {}, gotoT = {}, fills = [], conflicts = [];
+
+    lr0.states.forEach(function (I) {
+      action[I.id] = {}; gotoT[I.id] = {};
+      terms.forEach(function (a) { action[I.id][a] = []; });
+    });
+
+    function put(stateId, sym, entry) {
+      var cell = action[stateId][sym];
+      var same = cell.filter(function (e) { return entryStr(e) === entryStr(entry); })[0];
+      if (same) {
+        /* Another item gives the identical action: record it as an extra cause only. */
+        if (same.items.indexOf(entry.items[0]) < 0) same.items.push(entry.items[0]);
+        return;
+      }
+      cell.push(entry);
+      fills.push({ table: 'action', state: stateId, sym: sym, entry: entry, conflict: cell.length > 1 });
+    }
+
+    lr0.states.forEach(function (I) {
+      I.items.forEach(function (it) {
+        var p = g.productions[it.p];
+        var X = afterDot(g, it);
+        var key = itemKey(it);
+        if (X && !isNT(g, X)) {
+          /* Rule 2(a): [A → α • a β] in Ii and goto(Ii, a) = Ij  ⇒  shift j */
+          var to = I.transitions.filter(function (t) { return t.sym === X; })[0].to;
+          put(I.id, X, { type: 's', to: to, items: [key], rule: 'a',
+            reason: itemStr(g, it) + ' is in I' + I.id + ' and goto(I' + I.id + ', ' + X + ') = I' + to +
+              ', so ACTION[' + I.id + ', ' + X + '] = shift ' + to });
+        } else if (!X) {
+          if (it.p === 0) {
+            /* Rule 2(c): [S' → S •] in Ii  ⇒  accept on $ */
+            put(I.id, END, { type: 'acc', items: [key], rule: 'c',
+              reason: itemStr(g, it) + ' is in I' + I.id + ', so ACTION[' + I.id + ', $] = accept' });
+          } else {
+            /* Rule 2(b): [A → α •] in Ii  ⇒  reduce for every a in FOLLOW(A) */
+            var fol = Object.keys(ff.follow[p.lhs]);
+            terms.forEach(function (a) {
+              if (fol.indexOf(a) < 0) return;
+              put(I.id, a, { type: 'r', prod: p.index, items: [key], follow: p.lhs, rule: 'b',
+                reason: itemStr(g, it) + ' is complete and ' + a + ' ∈ FOLLOW(' + p.lhs + ') = { ' + fol.join(', ') +
+                  ' }, so ACTION[' + I.id + ', ' + a + '] = reduce by (' + p.index + ') ' + prodStr(p) });
+            });
+          }
+        }
+      });
+      /* Rule 3: goto(Ii, A) = Ij  ⇒  GOTO[i, A] = j */
+      I.transitions.forEach(function (t) {
+        if (!isNT(g, t.sym)) return;
+        gotoT[I.id][t.sym] = t.to;
+        fills.push({ table: 'goto', state: I.id, sym: t.sym, entry: { type: 'g', to: t.to, rule: '3',
+          reason: 'goto(I' + I.id + ', ' + t.sym + ') = I' + t.to + ', so GOTO[' + I.id + ', ' + t.sym + '] = ' + t.to } });
+      });
+    });
+
+    lr0.states.forEach(function (I) {
+      terms.forEach(function (a) {
+        var cell = action[I.id][a];
+        if (cell.length < 2) return;
+        var reduces = cell.filter(function (e) { return e.type === 'r'; });
+        var shifts = cell.filter(function (e) { return e.type === 's'; });
+        var type = shifts.length && reduces.length ? 'shift-reduce' : 'reduce-reduce';
+        var items = [];
+        cell.forEach(function (e) { e.items.forEach(function (k) { if (items.indexOf(k) < 0) items.push(k); }); });
+        var lhsList = reduces.map(function (r) { return g.productions[r.prod].lhs; });
+        var explain = type === 'shift-reduce'
+          ? 'I' + I.id + ' has a transition on ' + a + ' (shift), and ' + a + ' is also in FOLLOW(' + lhsList.join(', ') +
+            ') of a completed item (reduce). On lookahead ' + a + ' the parser cannot choose between shifting and reducing.'
+          : 'I' + I.id + ' has completed items for ' + lhsList.join(' and ') + ', and ' + a + ' is in ' +
+            lhsList.map(function (A) { return 'FOLLOW(' + A + ')'; }).join(' ∩ ') +
+            '. On lookahead ' + a + ' the parser cannot choose which production to reduce by.';
+        conflicts.push({ state: I.id, sym: a, type: type, entries: cell.slice(), items: items, explain: explain });
+      });
+    });
+
+    /* LR(0) check: a completed item together with any other action makes the grammar not LR(0). */
+    var lr0Conflicts = [];
+    lr0.states.forEach(function (I) {
+      var complete = I.items.filter(function (it) { return !afterDot(g, it) && it.p !== 0; });
+      var shiftsT = I.items.filter(function (it) { var X = afterDot(g, it); return X && !isNT(g, X); });
+      if (complete.length > 1 || (complete.length && shiftsT.length)) {
+        lr0Conflicts.push({ state: I.id, type: complete.length > 1 ? 'reduce-reduce' : 'shift-reduce' });
+      }
+    });
+
+    return {
+      terminals: terms, nonTerminals: nts, action: action, goto: gotoT,
+      fills: fills, conflicts: conflicts, isSLR: conflicts.length === 0,
+      lr0Conflicts: lr0Conflicts, isLR0: lr0Conflicts.length === 0
+    };
+  }
+
+  /* Text of a cell as printed in the table: "" when empty, "s3/r2" when in conflict. */
+  function cellText(table, state, sym) {
+    if (table.action[state] && table.action[state].hasOwnProperty(sym)) {
+      return table.action[state][sym].map(entryStr).join('/');
+    }
+    var gv = table.goto[state] && table.goto[state][sym];
+    return gv === undefined ? '' : String(gv);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Shift-reduce parse simulation                                       */
+  /* ------------------------------------------------------------------ */
+
+  /*
+   * simulate(g, table, tokens) -> { steps, accepted, error, tree }
+   * Each step is a full snapshot (stack, input pointer, forest of subtrees) taken
+   * before the move is applied, so the interface can step backwards freely.
+   * When a cell holds a conflict the first entry is used and the step says so.
+   */
+  function simulate(g, table, tokens, limit) {
+    limit = limit || 5000;
+    var nodeSeq = 0;
+    function node(sym, children, prod) { return { id: ++nodeSeq, sym: sym, children: children || [], prod: prod }; }
+
+    var input = tokens.concat([END]);
+    var stack = [{ state: 0, sym: null }];
+    var forest = [];
+    var ip = 0, steps = [];
+
+    function snapshot(extra) {
+      var s = { stack: stack.map(function (e) { return { state: e.state, sym: e.sym }; }), ip: ip, input: input, forest: forest.slice() };
+      Object.keys(extra).forEach(function (k) { s[k] = extra[k]; });
+      s.index = steps.length;
+      steps.push(s);
+      return s;
+    }
+
+    while (steps.length < limit) {
+      var top = stack[stack.length - 1].state;
+      var a = input[ip];
+      var cell = table.action[top][a] || [];
+      if (!cell.length) {
+        var expected = table.terminals.filter(function (t) { return table.action[top][t].length; });
+        var err = { position: ip, symbol: a, expected: expected, state: top };
+        snapshot({ type: 'error', cell: { state: top, sym: a }, error: err,
+          reason: 'ACTION[' + top + ', ' + a + '] is empty, so there is no valid move. Expected one of: ' + (expected.join('  ') || 'nothing') });
+        return { steps: steps, accepted: false, error: err };
+      }
+      var e = cell[0];
+      var conflictNote = cell.length > 1 ? ' — this cell is a conflict (' + cell.map(entryStr).join(' / ') + '); the simulation takes ' + entryStr(e) : '';
+
+      if (e.type === 'acc') {
+        snapshot({ type: 'accept', cell: { state: top, sym: a }, action: 'acc', conflict: cell.length > 1,
+          reason: 'ACTION[' + top + ', $] = accept: the whole input reduces to ' + g.start + conflictNote });
+        return { steps: steps, accepted: true, tree: forest[forest.length - 1] };
+      }
+      if (e.type === 's') {
+        snapshot({ type: 'shift', cell: { state: top, sym: a }, action: 's' + e.to, conflict: cell.length > 1,
+          reason: 'ACTION[' + top + ', ' + a + '] = s' + e.to + ': push ' + a + ' and state ' + e.to + ', then advance the input' + conflictNote });
+        stack.push({ state: e.to, sym: a });
+        forest.push(node(a));
+        ip++;
+        continue;
+      }
+
+      var p = g.productions[e.prod];
+      var n = p.rhs.length;
+      var popped = stack.slice(stack.length - n);
+      var below = stack[stack.length - 1 - n].state;
+      var gto = table.goto[below][p.lhs];
+      snapshot({ type: 'reduce', cell: { state: top, sym: a }, action: 'r' + p.index, prod: p.index, conflict: cell.length > 1,
+        gotoCell: { state: below, sym: p.lhs, to: gto },
+        reason: 'ACTION[' + top + ', ' + a + '] = r' + p.index + ': reduce by ' + prodStr(p) + '. ' +
+          (n ? 'Pop ' + popped.map(function (x) { return x.sym + ' ' + x.state; }).join(' ') : 'Pop nothing (ε)') +
+          ', exposing state ' + below + '; GOTO[' + below + ', ' + p.lhs + '] = ' + gto + ', push ' + p.lhs + ' ' + gto + conflictNote });
+      stack.length -= n;
+      var kids = n ? forest.splice(forest.length - n, n) : [node(EPS)];
+      forest.push(node(p.lhs, kids, p.index));
+      if (gto === undefined) {
+        var gerr = { position: ip, symbol: a, expected: [], state: below };
+        snapshot({ type: 'error', cell: { state: below, sym: p.lhs }, error: gerr, reason: 'GOTO[' + below + ', ' + p.lhs + '] is empty' });
+        return { steps: steps, accepted: false, error: gerr };
+      }
+      stack.push({ state: gto, sym: p.lhs });
+    }
+    var lerr = { position: ip, symbol: input[ip], expected: [], state: -1 };
+    snapshot({ type: 'error', error: lerr, reason: 'Stopped after ' + limit + ' moves' });
+    return { steps: steps, accepted: false, error: lerr };
+  }
+
+  /* Run every construction stage; the interface and the tests both call this. */
+  function analyze(g) {
+    var ff = computeFirstFollow(g);
+    var lr0 = buildLR0(g);
+    var table = buildTable(g, ff, lr0);
+    return { grammar: g, ff: ff, lr0: lr0, table: table };
+  }
+
+  var api = {
+    EPS: EPS, END: END,
+    computeFirstFollow: computeFirstFollow, closure: closure, gotoKernel: gotoKernel,
+    buildLR0: buildLR0, buildTable: buildTable, simulate: simulate, analyze: analyze,
+    itemStr: itemStr, itemKey: itemKey, afterDot: afterDot, prodStr: prodStr,
+    entryStr: entryStr, cellText: cellText
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.SLR = api;
+})(this);
+
+</script><script>
+/*
+ * examples.js — the grammar bank.
+ * Most entries are the worked examples and exercises from the Module 2 lecture
+ * notes (Syntax Analysis), so results can be checked against the notes.
+ */
+(function (root) {
+  'use strict';
+
+  var EXAMPLES = [
+    {
+      id: 'expr',
+      title: 'E → E + T | T,  T → T * F | F,  F → ( E ) | id',
+      source: 'Project worked example · closure/goto, Module 2 p.171',
+      grammar: 'E -> E + T | T\nT -> T * F | F\nF -> ( E ) | id',
+      input: 'id + id * id',
+      note: 'The classic left-recursive expression grammar. SLR(1), not LR(0); 12 states.'
+    },
+    {
+      id: 'saa',
+      title: 'S → A A,  A → a A | b',
+      source: 'Module 2 p.175–178 (SLR example, parse of aabb)',
+      grammar: 'S -> AA\nA -> aA | b',
+      input: 'aabb',
+      note: 'Seven states. Compare the table and the trace with pages 177 and 178.'
+    },
+    {
+      id: 'ex2',
+      title: 'S → A a | b A c | B c | b B a,  A → d,  B → d   (not SLR)',
+      source: 'Module 2 p.179',
+      grammar: 'S -> Aa | bAc | Bc | bBa\nA -> d\nB -> d',
+      input: 'bdc',
+      note: 'A → d• and B → d• share a state, and FOLLOW(A) ∩ FOLLOW(B) = { a, c }. Not SLR(1).'
+    },
+    {
+      id: 'exer1',
+      title: 'E → E + T | T,  T → T * F | F,  F → id',
+      source: 'Module 2 p.183, exercise 1',
+      grammar: 'E -> E + T | T\nT -> T * F | F\nF -> id',
+      input: 'id * id + id',
+      note: 'The expression grammar without parentheses.'
+    },
+    {
+      id: 'exer2',
+      title: 'E → E + T | T,  T → T F | F,  F → F * | a | b',
+      source: 'Module 2 p.183, exercise 2',
+      grammar: 'E -> E + T | T\nT -> TF | F\nF -> F* | a | b',
+      input: 'a * b + a',
+      note: 'Written in compact form: TF means T F, and F* means F *.'
+    },
+    {
+      id: 'exer3',
+      title: 'S → L = R | R,  L → * R | id,  R → L   (not SLR)',
+      source: 'Module 2 p.183, exercise 3',
+      grammar: 'S -> L = R | R\nL -> * R | id\nR -> L',
+      input: '* id = id',
+      note: 'Unambiguous, but not SLR(1): in the state with S → L•=R and R → L•, the symbol = is in FOLLOW(R).'
+    },
+    {
+      id: 'eps',
+      title: 'X → Y z | a,  Y → b Z | ε,  Z → ε',
+      source: 'Module 2 p.199',
+      grammar: 'X -> Yz | a\nY -> bZ | ε\nZ -> ε',
+      input: 'b z',
+      note: 'Not LR(0) (I0 can shift a or reduce Y → ε) but SLR(1), because FOLLOW(Y) = { z }.'
+    },
+    {
+      id: 'paren',
+      title: 'S → ( S ) S | ε',
+      source: 'Additional example',
+      grammar: 'S -> ( S ) S | ε',
+      input: '( ( ) ( ) )',
+      note: 'A nullable start symbol: reductions by S → ε appear in several states.'
+    }
+  ];
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = EXAMPLES;
+  else root.EXAMPLES = EXAMPLES;
+})(this);
+
+</script><script>
+/*
+ * practice.js — question generation and answer checking for Practice mode.
+ *
+ * A practice session walks the whole SLR(1) pipeline for one grammar:
+ *   Round 1  FIRST and FOLLOW of every non-terminal
+ *   Round 2  the items of goto(Ii, X) for a few transitions
+ *   Round 3  hidden ACTION / GOTO cells, plus "is the grammar SLR(1)?"
+ *   Round 4  the next parser move at every step of a parse
+ *
+ * All answers are derived from the engine's own construction, never stored.
+ * No DOM code here, so the checks are unit-tested in Node.
+ */
+(function (root) {
+  'use strict';
+
+  var SLR = root.SLR || (typeof require !== 'undefined' ? require('./slr.js') : null);
+  var EPS = 'ε';
+
+  /* Small seeded generator so a session can be replayed with the same questions. */
+  function rng(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function shuffle(arr, rand) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(rand() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  /* ---------- answer normalisation ---------- */
+
+  /* "{ (, id }", "( id", "id,(" -> ['(', 'id'];  eps / epsilon / # / e -> ε */
+  function parseSymbolSet(text, terminals) {
+    var cleaned = String(text || '').replace(/[{}]/g, ' ').trim();
+    if (!cleaned) return [];
+    var parts = cleaned.split(/[\s,]+/).filter(Boolean);
+    var out = [];
+    parts.forEach(function (p) {
+      var s = /^(eps|epsilon|#|λ|ε)$/i.test(p) || (p === 'e' && (!terminals || terminals.indexOf('e') < 0)) ? EPS : p;
+      if (out.indexOf(s) < 0) out.push(s);
+    });
+    return out;
+  }
+
+  function compareSets(expected, given) {
+    var missing = expected.filter(function (s) { return given.indexOf(s) < 0; });
+    var extra = given.filter(function (s) { return expected.indexOf(s) < 0; });
+    return { correct: !missing.length && !extra.length, missing: missing, extra: extra };
+  }
+
+  /*
+   * One table entry to canonical form:
+   *   "S5" "shift 5" "s 5" -> s5 ;  "R3" "reduce 3" -> r3 ;  "accept" "acc" -> acc ;
+   *   "" "-" "err" "error" "blank" -> "" ;  "7" -> 7 (GOTO entry)
+   * Returns null when the text cannot be read as an entry.
+   */
+  function normalizeEntry(text) {
+    var t = String(text == null ? '' : text).trim().toLowerCase().replace(/\s+/g, '');
+    if (t === '' || t === '-' || t === 'err' || t === 'error' || t === 'blank' || t === 'e' || t === 'x') return '';
+    if (t === 'acc' || t === 'accept' || t === 'a' || t === 'ac') return 'acc';
+    var m = /^(s|shift)(\d+)$/.exec(t);
+    if (m) return 's' + Number(m[2]);
+    m = /^(r|reduce)(\d+)$/.exec(t);
+    if (m) return 'r' + Number(m[2]);
+    if (/^\d+$/.test(t)) return String(Number(t));
+    return null;
+  }
+
+  /* A cell answer may hold several entries ("s6/r5") when it is a conflict. */
+  function normalizeCell(text) {
+    var parts = String(text == null ? '' : text).split(/[\/,|]/);
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var n = normalizeEntry(parts[i]);
+      if (n === null) return null;
+      if (n !== '' && out.indexOf(n) < 0) out.push(n);
+    }
+    return out.sort();
+  }
+
+  function checkCell(expectedText, given) {
+    var exp = normalizeCell(expectedText);
+    var got = normalizeCell(given);
+    if (got === null) return { correct: false, unreadable: true };
+    return { correct: exp.join('/') === got.join('/') };
+  }
+
+  /* ---------- Round 1: FIRST and FOLLOW ---------- */
+
+  function firstFollowRound(an) {
+    var g = an.grammar, qs = [];
+    g.nonTerminals.slice(1).forEach(function (A) {
+      ['FIRST', 'FOLLOW'].forEach(function (kind) {
+        var set = kind === 'FIRST' ? an.ff.first[A] : an.ff.follow[A];
+        var answer = Object.keys(set);
+        var reasons = {};
+        answer.forEach(function (s) { reasons[s] = set[s].reason; });
+        qs.push({ id: kind + ':' + A, kind: kind, nt: A, answer: answer, reasons: reasons });
+      });
+    });
+    return qs;
+  }
+
+  function checkFirstFollow(q, text, terminals) {
+    var res = compareSets(q.answer, parseSymbolSet(text, terminals));
+    res.answer = q.answer;
+    return res;
+  }
+
+  /* ---------- Round 2: item sets ---------- */
+
+  function itemsRound(an, rand, count) {
+    var g = an.grammar;
+    var states = an.lr0.states;
+    var transitions = [];
+    states.forEach(function (I) {
+      I.transitions.forEach(function (t) { transitions.push({ from: I.id, sym: t.sym, to: t.to }); });
+    });
+    /* Prefer transitions whose target needs closure work, and one question per target. */
+    var seenTarget = {};
+    var ordered = shuffle(transitions, rand).sort(function (a, b) {
+      var ca = states[a.to].items.length - states[a.to].kernel.length;
+      var cb = states[b.to].items.length - states[b.to].kernel.length;
+      return (cb > 0) - (ca > 0);
+    });
+    var picked = [];
+    ordered.forEach(function (t) {
+      if (picked.length >= count || seenTarget[t.to]) return;
+      seenTarget[t.to] = true;
+      picked.push(t);
+    });
+
+    return picked.map(function (t) {
+      var target = states[t.to];
+      var correctKeys = target.items.map(SLR.itemKey);
+      /* Distractors: same productions with the dot one place off, then other initial items. */
+      var pool = [];
+      target.items.forEach(function (it) {
+        [it.d - 1, it.d + 1].forEach(function (d) {
+          if (d < 0 || d > g.productions[it.p].rhs.length) return;
+          var k = it.p + '.' + d;
+          if (correctKeys.indexOf(k) < 0 && pool.indexOf(k) < 0) pool.push(k);
+        });
+      });
+      g.productions.forEach(function (p) {
+        var k = p.index + '.0';
+        if (p.index !== 0 && correctKeys.indexOf(k) < 0 && pool.indexOf(k) < 0) pool.push(k);
+      });
+      var distractors = shuffle(pool, rand).slice(0, Math.max(3, Math.min(5, correctKeys.length + 1)));
+      var candidates = shuffle(correctKeys.concat(distractors), rand).map(function (k) {
+        var parts = k.split('.');
+        return { key: k, text: SLR.itemStr(g, { p: +parts[0], d: +parts[1] }) };
+      });
+      var kernelText = target.kernel.map(function (it) { return SLR.itemStr(g, it); });
+      var closureText = target.items.filter(function (it) { return !it.kernel; }).map(function (it) { return SLR.itemStr(g, it); });
+      return {
+        id: 'goto:' + t.from + ':' + t.sym, from: t.from, sym: t.sym, to: t.to,
+        answer: correctKeys, candidates: candidates,
+        explain: 'Move the dot over ' + t.sym + ' in every item of I' + t.from + ' that has ' + t.sym + ' after the dot: ' +
+          kernelText.join(' ; ') + '.' +
+          (closureText.length ? ' Closure then adds ' + closureText.join(' ; ') + '.' : ' No closure items are added.') +
+          ' This set is I' + t.to + '.'
+      };
+    });
+  }
+
+  function checkItems(q, chosenKeys) {
+    var res = compareSets(q.answer, chosenKeys || []);
+    res.answer = q.answer;
+    return res;
+  }
+
+  /* ---------- Round 3: table cells ---------- */
+
+  function tableRound(an, rand, count) {
+    var t = an.table, g = an.grammar;
+    var buckets = { shift: [], reduce: [], accept: [], goto: [], blank: [], conflict: [] };
+    an.lr0.states.forEach(function (I) {
+      t.terminals.forEach(function (a) {
+        var cell = t.action[I.id][a];
+        var q = { state: I.id, sym: a, table: 'action' };
+        if (!cell.length) buckets.blank.push(q);
+        else if (cell.length > 1) buckets.conflict.push(q);
+        else buckets[{ s: 'shift', r: 'reduce', acc: 'accept' }[cell[0].type]].push(q);
+      });
+      t.nonTerminals.forEach(function (A) {
+        if (t.goto[I.id][A] !== undefined) buckets.goto.push({ state: I.id, sym: A, table: 'goto' });
+      });
+    });
+    Object.keys(buckets).forEach(function (k) { buckets[k] = shuffle(buckets[k], rand); });
+
+    /* Guarantee variety first, then fill the rest from shifts, reduces and gotos. */
+    var picked = [];
+    ['reduce', 'shift', 'goto', 'accept', 'conflict', 'blank', 'reduce', 'shift', 'goto'].forEach(function (k) {
+      if (picked.length < count && buckets[k].length) picked.push(buckets[k].shift());
+    });
+    var rest = shuffle(buckets.shift.concat(buckets.reduce, buckets.goto), rand);
+    while (picked.length < count && rest.length) picked.push(rest.shift());
+
+    return picked.map(function (q) {
+      var answer = SLR.cellText(t, q.state, q.sym);
+      var reason;
+      if (q.table === 'goto') {
+        reason = 'goto(I' + q.state + ', ' + q.sym + ') = I' + answer + ', so GOTO[' + q.state + ', ' + q.sym + '] = ' + answer + '.';
+      } else if (!answer) {
+        reason = 'No item in I' + q.state + ' has ' + q.sym + ' after the dot, and no completed item has ' + q.sym +
+          ' in the FOLLOW set of its left side, so the cell is blank (error).';
+      } else {
+        reason = t.action[q.state][q.sym].map(function (e) { return e.reason; }).join(' Also: ') + '.';
+      }
+      return { id: q.table + ':' + q.state + ':' + q.sym, state: q.state, sym: q.sym, table: q.table, answer: answer, reason: reason };
+    }).sort(function (a, b) { return a.state - b.state; });
+  }
+
+  function slrQuestion(an) {
+    var t = an.table;
+    return {
+      answer: t.isSLR,
+      explain: t.isSLR
+        ? 'No cell of the ACTION table received two entries, so the grammar is SLR(1).'
+        : 'The table has ' + t.conflicts.length + ' conflicting cell' + (t.conflicts.length === 1 ? '' : 's') + ': ' +
+          t.conflicts.map(function (c) { return c.type + ' in state ' + c.state + ' on ' + c.sym; }).join('; ') + '. So the grammar is not SLR(1).'
+    };
+  }
+
+  /* ---------- Round 4: parse moves ---------- */
+
+  function parseRound(an, tokens) {
+    var sim = SLR.simulate(an.grammar, an.table, tokens);
+    return {
+      sim: sim,
+      questions: sim.steps.map(function (s, i) {
+        var answer = s.type === 'error' ? '' : (s.type === 'accept' ? 'acc' : s.action);
+        return { id: 'move:' + i, step: i, answer: answer, reason: s.reason, type: s.type };
+      })
+    };
+  }
+
+  function checkMove(q, text) {
+    var got = normalizeEntry(text);
+    if (got === null) return { correct: false, unreadable: true };
+    return { correct: got === q.answer };
+  }
+
+  /* ---- Test mode: best result per grammar (storage itself lives in the UI) ---- */
+  /* Stable key from the grammar's productions only, so the input string and spacing do not matter. */
+  function bestKey(g) {
+    var s = g.productions.map(function (p) { return p.lhs + '>' + p.rhs.join(' '); }).join('|'), h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return 'slr.testbest.' + (h >>> 0).toString(36);
+  }
+  /* A stored value is { ok, of, ms }; anything else (missing, malformed) reads as null. */
+  function parseBest(raw) {
+    var r;
+    try { r = JSON.parse(raw); } catch (e) { return null; }
+    if (!r || typeof r !== 'object') return null;
+    if (!(isFinite(r.ok) && isFinite(r.of) && isFinite(r.ms)) || r.of <= 0 || r.ok < 0 || r.ok > r.of || r.ms < 0) return null;
+    return { ok: +r.ok, of: +r.of, ms: +r.ms };
+  }
+  /* Higher score wins; on equal scores the shorter time wins. A missing old result always loses. */
+  function isBetter(a, b) {
+    if (!b) return true;
+    var d = a.ok * b.of - b.ok * a.of;
+    return d > 0 || (d === 0 && a.ms < b.ms);
+  }
+
+  var api = {
+    bestKey: bestKey, parseBest: parseBest, isBetter: isBetter,
+    rng: rng, shuffle: shuffle,
+    parseSymbolSet: parseSymbolSet, compareSets: compareSets,
+    normalizeEntry: normalizeEntry, normalizeCell: normalizeCell, checkCell: checkCell,
+    firstFollowRound: firstFollowRound, checkFirstFollow: checkFirstFollow,
+    itemsRound: itemsRound, checkItems: checkItems,
+    tableRound: tableRound, slrQuestion: slrQuestion,
+    parseRound: parseRound, checkMove: checkMove
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Practice = api;
+})(this);
+
+</script><script>
+/*
+ * core.js — the shared session layer every interface template drives.
+ *
+ * Wraps the engine (grammar.js + slr.js) and answers "what does stage X look
+ * like at step i?" as plain data. Templates only decide how to draw it, so all
+ * five interfaces show exactly the same construction.
+ *
+ * Also provides one global timeline across stages:
+ *   FIRST/FOLLOW steps → LR(0) steps → table fills → parse moves
+ * so a template can drive everything from a single scrubber.
+ */
+(function (root) {
+  'use strict';
+
+  var G = root.Grammar, SLR = root.SLR;
+  var STAGES = ['ff', 'items', 'table', 'parse'];
+  var STAGE_NAMES = { grammar: 'Grammar', ff: 'FIRST & FOLLOW', items: 'LR(0) items', table: 'Parsing table', conflicts: 'Conflicts', parse: 'Parse' };
+
+  function esc(x) {
+    return String(x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Building a session                                                  */
+  /* ------------------------------------------------------------------ */
+
+  function build(cfg) {
+    var g;
+    try { g = G.parseGrammar(cfg.grammar, { spaceOnly: !!cfg.spaceOnly }); }
+    catch (e) { return { ok: false, error: e.message, where: 'grammar' }; }
+    var an = SLR.analyze(g);
+    var tokens = null, tokenError = null;
+    try { tokens = G.tokenizeInput(cfg.input || '', g); } catch (e) { tokenError = e.message; }
+    var sim = tokens ? SLR.simulate(g, an.table, tokens) : null;
+
+    var s = { cfg: cfg, g: g, an: an, tokens: tokens, tokenError: tokenError, sim: sim };
+    s.counts = { ff: an.ff.steps.length, items: an.lr0.steps.length, table: an.table.fills.length, parse: sim ? sim.steps.length : 0 };
+    s.timeline = [];
+    s.ranges = {};
+    STAGES.forEach(function (st) {
+      var start = s.timeline.length;
+      for (var i = 0; i < s.counts[st]; i++) s.timeline.push({ stage: st, i: i });
+      s.ranges[st] = [start, s.timeline.length - 1];
+    });
+    save(cfg);
+    return { ok: true, s: s };
+  }
+
+  /* Local index of a stage when the global timeline is at position gi: -1 before it starts. */
+  function localIndex(s, stage, gi) {
+    var r = s.ranges[stage];
+    if (!r || r[1] < r[0]) return -1;
+    if (gi < r[0]) return -1;
+    return Math.min(gi, r[1]) - r[0];
+  }
+  function globalIndex(s, stage, i) { return s.ranges[stage][0] + i; }
+  function locate(s, gi) { return s.timeline[Math.max(0, Math.min(s.timeline.length - 1, gi))]; }
+
+  /* ------------------------------------------------------------------ */
+  /* Grammar                                                             */
+  /* ------------------------------------------------------------------ */
+
+  function prods(s) {
+    return s.g.productions.map(function (p) { return { index: p.index, text: SLR.prodStr(p), lhs: p.lhs, rhs: p.rhs }; });
+  }
+
+  function grammarInfo(s) {
+    var seen = {};
+    return {
+      start: s.g.start, augmented: s.g.augmentedStart,
+      nonTerminals: s.g.nonTerminals, terminals: s.g.terminals,
+      productions: prods(s), warnings: s.g.warnings,
+      splits: s.g.splits.filter(function (x) { if (seen[x.text]) return false; seen[x.text] = 1; return true; }),
+      tokens: s.tokens, tokenError: s.tokenError,
+      verdict: { isSLR: s.an.table.isSLR, isLR0: s.an.table.isLR0, states: s.an.lr0.states.length, conflicts: s.an.table.conflicts.length }
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* FIRST / FOLLOW at step i                                            */
+  /* ------------------------------------------------------------------ */
+
+  function ff(s, i) {
+    var steps = s.an.ff.steps, shown = {};
+    steps.slice(0, i + 1).forEach(function (st) { shown[st.kind + ':' + st.of + ':' + st.sym] = true; });
+    var cur = i >= 0 ? steps[i] : null;
+    var rows = s.g.nonTerminals.map(function (A) {
+      function list(kind) {
+        var set = kind === 'FIRST' ? s.an.ff.first[A] : s.an.ff.follow[A];
+        return Object.keys(set).filter(function (x) { return shown[kind + ':' + A + ':' + x]; }).map(function (x) {
+          return { sym: x, isNew: !!(cur && cur.kind === kind && cur.of === A && cur.sym === x), reason: set[x].reason };
+        });
+      }
+      return { nt: A, first: list('FIRST'), follow: list('FOLLOW') };
+    });
+    return {
+      rows: rows, cur: cur, steps: steps,
+      text: cur ? cur.sym + ' ∈ ' + cur.kind + '(' + cur.of + ') — ' + cur.reason : 'Nothing computed yet.'
+    };
+  }
+
+  function setReason(s, kind, A, sym) {
+    var set = kind === 'FIRST' ? s.an.ff.first[A] : s.an.ff.follow[A];
+    return set && set[sym] ? set[sym].reason : '';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* LR(0) items at step i                                               */
+  /* ------------------------------------------------------------------ */
+
+  function items(s, i) {
+    var steps = s.an.lr0.steps, states = new Set(), edges = new Set();
+    steps.slice(0, Math.max(0, i) + 1).forEach(function (st) {
+      states.add(st.state);
+      if (st.from !== null && st.from !== undefined) edges.add(st.from + '>' + st.state + ':' + st.sym);
+    });
+    var cur = steps[Math.max(0, i)];
+    if (i < 0) { states = new Set(); edges = new Set(); }
+    return {
+      states: states, edges: edges, cur: i < 0 ? null : cur,
+      current: i < 0 ? null : cur.state,
+      currentEdge: i >= 0 && cur.from !== null && cur.from !== undefined ? { from: cur.from, to: cur.state } : null,
+      conflictStates: new Set(s.an.table.conflicts.map(function (c) { return c.state; })),
+      text: i < 0 ? 'Not started.' : cur.text
+    };
+  }
+
+  function originOf(s, id) {
+    if (id === 0) return 'closure({ ' + SLR.itemStr(s.g, { p: 0, d: 0 }) + ' })';
+    var st = s.an.lr0.steps.filter(function (x) { return x.type === 'new' && x.state === id; })[0];
+    return st ? 'goto(I' + st.from + ', ' + st.sym + ')' : '';
+  }
+
+  function itemLines(s, I, hlKeys) {
+    return I.items.map(function (it) {
+      var why = null;
+      if (!it.kernel) {
+        var f = it.from.split('.');
+        why = 'closure of ' + SLR.itemStr(s.g, { p: +f[0], d: +f[1] });
+      }
+      return { text: SLR.itemStr(s.g, it), kernel: it.kernel, why: why, key: SLR.itemKey(it), hl: !!(hlKeys && hlKeys.indexOf(SLR.itemKey(it)) >= 0), complete: SLR.afterDot(s.g, it) === null };
+    });
+  }
+
+  function stateInfo(s, id) {
+    var I = s.an.lr0.states[id];
+    if (!I) return null;
+    var completed = [];
+    I.items.forEach(function (it) {
+      if (SLR.afterDot(s.g, it) === null) completed.push(it.p === 0 ? 'accept on $' : 'reduce by (' + it.p + ') ' + SLR.prodStr(s.g.productions[it.p]));
+    });
+    return { id: id, origin: originOf(s, id), items: itemLines(s, I), kernelCount: I.kernel.length, completed: completed, transitions: I.transitions.slice() };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Table at step i                                                     */
+  /* ------------------------------------------------------------------ */
+
+  function key(a, b) { return a + '\u0001' + b; }
+
+  function tableAt(s, i) {
+    var t = s.an.table, acc = {};
+    t.fills.slice(0, i + 1).forEach(function (f) { (acc[key(f.state, f.sym)] = acc[key(f.state, f.sym)] || []).push(f.entry); });
+    var cur = i >= 0 ? t.fills[i] : null;
+    var cols = t.terminals.concat(t.nonTerminals);
+    var rows = s.an.lr0.states.map(function (I) {
+      return {
+        state: I.id,
+        cells: cols.map(function (c) {
+          var list = acc[key(I.id, c)] || [];
+          var kind = list.length > 1 ? 'conf' : list.length ? (list[0].type === 'g' ? 'g' : list[0].type) : '';
+          return { sym: c, text: list.map(SLR.entryStr).join('/'), kind: kind, cur: !!(cur && cur.state === I.id && cur.sym === c), isGoto: t.nonTerminals.indexOf(c) >= 0 };
+        })
+      };
+    });
+    return { terminals: t.terminals, nonTerminals: t.nonTerminals, rows: rows, cur: cur, acc: acc, text: cur ? cur.entry.reason + (cur.conflict ? ' — the cell already had an entry: conflict.' : '') : 'Table empty.' };
+  }
+
+  /* Why a cell holds what it holds (or is blank). i limits to the entries filled so far. */
+  function cellInfo(s, state, sym, i) {
+    var t = s.an.table, g = s.g, I = s.an.lr0.states[state];
+    var at = tableAt(s, i === undefined ? t.fills.length - 1 : i);
+    var entries = at.acc[key(state, sym)] || [];
+    var isGoto = t.nonTerminals.indexOf(sym) >= 0;
+    var full = SLR.cellText(t, state, sym);
+    var out = { title: (isGoto ? 'GOTO' : 'ACTION') + '[' + state + ', ' + sym + ']', state: state, sym: sym, origin: originOf(s, state), entries: [], blank: null, pending: null, conflict: entries.length > 1 };
+    var hl = [];
+    if (!entries.length) {
+      if (full) out.pending = 'Not filled yet at this step. Final entry: ' + full + '.';
+      else if (isGoto) out.blank = 'I' + state + ' has no item with ' + sym + ' after the dot, so goto(I' + state + ', ' + sym + ') is empty. Blank means error.';
+      else {
+        var parts = ['No item in I' + state + ' has ' + sym + ' after the dot, so there is no shift.'];
+        I.items.forEach(function (it) {
+          if (SLR.afterDot(g, it) === null && it.p !== 0) {
+            var A = g.productions[it.p].lhs;
+            parts.push(SLR.itemStr(g, it) + ' is complete, but ' + sym + ' ∉ FOLLOW(' + A + ') = { ' + Object.keys(s.an.ff.follow[A]).join(', ') + ' }, so no reduce.');
+          }
+        });
+        parts.push('The cell stays blank: an error entry.');
+        out.blank = parts.join(' ');
+      }
+    }
+    entries.forEach(function (e) {
+      hl = hl.concat(e.items || []);
+      var o = { tag: SLR.entryStr(e), type: e.type, rule: { a: 'rule 2(a) · shift', b: 'rule 2(b) · reduce', c: 'rule 2(c) · accept', 3: 'rule 3 · goto' }[e.rule] || '', reason: e.reason };
+      if (e.type === 'r') {
+        var A = g.productions[e.prod].lhs;
+        o.follow = 'FOLLOW(' + A + ') = { ' + Object.keys(s.an.ff.follow[A]).join(', ') + ' }';
+      }
+      out.entries.push(o);
+    });
+    out.items = itemLines(s, I, hl);
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Conflicts                                                           */
+  /* ------------------------------------------------------------------ */
+
+  function conflicts(s) {
+    var t = s.an.table, g = s.g;
+    return {
+      isSLR: t.isSLR, isLR0: t.isLR0,
+      list: t.conflicts.map(function (c) {
+        return {
+          type: c.type, state: c.state, sym: c.sym, cell: c.entries.map(SLR.entryStr).join(' / '),
+          entries: c.entries.map(function (e) { return { tag: SLR.entryStr(e), reason: e.reason }; }),
+          items: itemLines(s, s.an.lr0.states[c.state], c.items), explain: c.explain
+        };
+      }),
+      lr0: t.lr0Conflicts.map(function (c) {
+        var I = s.an.lr0.states[c.state], parts = [];
+        I.items.forEach(function (it) {
+          var X = SLR.afterDot(g, it);
+          if (X === null && it.p !== 0) {
+            var A = g.productions[it.p].lhs;
+            parts.push(SLR.itemStr(g, it) + ' reduces on FOLLOW(' + A + ') = { ' + Object.keys(s.an.ff.follow[A]).join(', ') + ' }');
+          } else if (X && g.nonTerminals.indexOf(X) < 0) parts.push(SLR.itemStr(g, it) + ' shifts on ' + X);
+        });
+        return { state: c.state, type: c.type, parts: parts, resolved: !t.conflicts.some(function (x) { return x.state === c.state; }) };
+      })
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Parse at step i                                                     */
+  /* ------------------------------------------------------------------ */
+
+  function stackText(stack) {
+    return stack.map(function (e) { return (e.sym === null ? '' : e.sym + ' ') + e.state; }).join(' ');
+  }
+
+  function actionText(s, st) {
+    if (st.type === 'shift') return 'shift ' + st.action.slice(1);
+    if (st.type === 'reduce') return 'reduce ' + SLR.prodStr(s.g.productions[st.prod]);
+    return st.type;
+  }
+
+  function parse(s, i) {
+    if (!s.sim || i < 0) return null;
+    var steps = s.sim.steps, st = steps[Math.min(i, steps.length - 1)];
+    var n = st.type === 'reduce' ? s.g.productions[st.prod].rhs.length : 0;
+    var after = steps[i + 1] ? steps[i + 1].forest : st.forest;
+    var last = i >= steps.length - 1;
+    return {
+      step: st, index: i, count: steps.length, kind: st.type, reason: st.reason, prod: st.prod,
+      stack: stackText(st.stack), input: st.input.slice(st.ip).join(' '), action: actionText(s, st),
+      forest: after, fresh: st.type === 'reduce' && after.length ? after[after.length - 1].id : null,
+      popFrom: st.type === 'reduce' && n ? st.stack.length - n : undefined,
+      done: last, accepted: last && st.type === 'accept', error: last && st.type === 'error' ? st.error : null
+    };
+  }
+
+  function traceRows(s) {
+    if (!s.sim) return [];
+    return s.sim.steps.map(function (st, i) {
+      return { n: i + 1, stack: stackText(st.stack), input: st.input.slice(st.ip).join(' '), action: actionText(s, st), type: st.type, conflict: !!st.conflict, short: st.action || st.type };
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Persistence, sharing, export                                        */
+  /* ------------------------------------------------------------------ */
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
+    return null;
+  }
+  function save(cfg) { store('slr.last', JSON.stringify({ g: cfg.grammar, w: cfg.input, s: !!cfg.spaceOnly })); }
+
+  /* Initial grammar: shared link > last session (any template) > the expression grammar. */
+  function initial() {
+    var p = new URLSearchParams(location.hash.slice(1));
+    if (p.get('g')) return { grammar: p.get('g'), input: p.get('w') || '', spaceOnly: p.get('s') === '1' };
+    try {
+      var last = JSON.parse(store('slr.last') || 'null');
+      if (last && last.g) return { grammar: last.g, input: last.w || '', spaceOnly: !!last.s };
+    } catch (e) { /* ignore */ }
+    var ex = root.EXAMPLES[0];
+    return { grammar: ex.grammar, input: ex.input, spaceOnly: false };
+  }
+
+  function shareURL(cfg) {
+    var p = new URLSearchParams();
+    p.set('g', cfg.grammar); p.set('w', cfg.input || '');
+    if (cfg.spaceOnly) p.set('s', '1');
+    return location.href.split('#')[0] + '#' + p.toString();
+  }
+
+  function copy(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return Promise.reject(new Error('no clipboard'));
+  }
+
+  function downloadCSV(s) {
+    var t = s.an.table, cols = t.terminals.concat(t.nonTerminals);
+    var q = function (x) { return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+    var lines = [['State'].concat(cols.map(function (c) { return (t.terminals.indexOf(c) >= 0 ? 'ACTION ' : 'GOTO ') + c; })).map(q).join(',')];
+    s.an.lr0.states.forEach(function (I) { lines.push([String(I.id)].concat(cols.map(function (c) { return SLR.cellText(t, I.id, c); })).map(q).join(',')); });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'slr-table.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function example(id) { return root.EXAMPLES.filter(function (e) { return e.id === id; })[0] || null; }
+  function exampleFor(grammarText) { return root.EXAMPLES.filter(function (e) { return e.grammar === grammarText; })[0] || null; }
+
+  /* Graph layering for templates that draw their own automaton: BFS depth = column. */
+  function layers(s) {
+    var st = s.an.lr0.states, depth = { 0: 0 }, q = [0], cols = [];
+    while (q.length) {
+      var x = q.shift();
+      st[x].transitions.forEach(function (t) { if (depth[t.to] === undefined) { depth[t.to] = depth[x] + 1; q.push(t.to); } });
+    }
+    st.forEach(function (I) { (cols[depth[I.id]] = cols[depth[I.id]] || []).push(I.id); });
+    var pos = {};
+    cols.forEach(function (c, ci) { c.forEach(function (id, ri) { pos[id] = { col: ci, row: ri, rows: c.length }; }); });
+    var edges = [];
+    st.forEach(function (I) { I.transitions.forEach(function (t) { edges.push({ from: I.id, to: t.to, sym: t.sym, nt: s.g.nonTerminals.indexOf(t.sym) >= 0 }); }); });
+    return { pos: pos, cols: cols, edges: edges };
+  }
+
+  root.Core = {
+    layers: layers,
+    STAGES: STAGES, STAGE_NAMES: STAGE_NAMES, esc: esc,
+    build: build, localIndex: localIndex, globalIndex: globalIndex, locate: locate,
+    grammarInfo: grammarInfo, prods: prods,
+    ff: ff, setReason: setReason,
+    items: items, stateInfo: stateInfo, originOf: originOf, itemLines: itemLines,
+    tableAt: tableAt, cellInfo: cellInfo,
+    conflicts: conflicts,
+    parse: parse, traceRows: traceRows, stackText: stackText,
+    store: store, initial: initial, shareURL: shareURL, copy: copy, downloadCSV: downloadCSV,
+    example: example, exampleFor: exampleFor, examples: function () { return root.EXAMPLES; }
+  };
+})(this);
+
+</script><script>
+/*
+ * lesson.js — one flat list of teaching steps and one list of practice questions,
+ * built from the engine. DOM-free; every UI template renders these its own way.
+ *
+ *   Lesson.steps(s)        -> [{ stage, title, text, ref }]   (ref points into the engine data)
+ *   Lesson.questions(s, n) -> [{ stage, kind, prompt, answer, options, why, check(text) }]
+ */
+(function (root) {
+  'use strict';
+  var Core = root.Core, P = root.Practice, SLR = root.SLR;
+  var STAGE = { grammar: 'Grammar', ff: 'FIRST & FOLLOW', items: 'LR(0) items', table: 'Parsing table', conflicts: 'Conflicts', parse: 'Parse' };
+
+  function steps(s) {
+    var out = [], g = s.g;
+    out.push({ stage: 'grammar', title: 'Augment the grammar', text: 'Add (0) ' + SLR.prodStr(g.productions[0]) + ' so the parser knows when it is finished.', ref: {} });
+    s.an.ff.steps.forEach(function (st, i) {
+      out.push({ stage: 'ff', title: st.sym + ' ∈ ' + st.kind + '(' + st.of + ')', text: st.reason + '.', ref: { i: i } });
+    });
+    s.an.lr0.steps.forEach(function (st, i) {
+      out.push({ stage: 'items', title: st.type === 'start' ? 'Start: I0' : 'goto(I' + st.from + ', ' + st.sym + ')', text: st.text + '.', ref: { i: i } });
+    });
+    s.an.table.fills.forEach(function (f, i) {
+      out.push({ stage: 'table', title: (f.table === 'goto' ? 'GOTO' : 'ACTION') + '[' + f.state + ', ' + f.sym + '] = ' + SLR.entryStr(f.entry), text: f.entry.reason + '.', ref: { i: i } });
+    });
+    var c = Core.conflicts(s);
+    out.push({ stage: 'conflicts', title: c.isSLR ? 'No conflicts' : c.list.length + ' conflict(s)', text: c.isSLR ? 'Every cell has at most one entry, so the grammar is SLR(1).' : c.list.map(function (x) { return x.explain; }).join(' '), ref: {} });
+    if (s.sim) s.sim.steps.forEach(function (st, i) {
+      out.push({ stage: 'parse', title: 'Move ' + (i + 1) + ': ' + st.type, text: st.reason + '.', ref: { i: i } });
+    });
+    return out;
+  }
+
+  function shuffle(a, r) { return P.shuffle(a, r); }
+  function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
+
+  /* Practice questions across all stages; each has a typed answer and, where it helps, choices. */
+  function questions(s, seed) {
+    var rand = P.rng(seed || 7), qs = [], t = s.an.table;
+    /* FIRST / FOLLOW: two sets */
+    var ff = P.firstFollowRound(s.an);
+    shuffle(ff, rand).slice(0, 3).forEach(function (q) {
+      var ans = '{ ' + q.answer.join(', ') + ' }';
+      var all = uniq([].concat.apply([], ff.map(function (x) { return x.answer; })));
+      var wrong1 = q.answer.slice(0, -1), wrong2 = uniq(q.answer.concat([all.filter(function (x) { return q.answer.indexOf(x) < 0; })[0]]).filter(Boolean));
+      qs.push({ stage: 'ff', kind: 'set', prompt: q.kind + '(' + q.nt + ') = ?', answer: ans,
+        options: shuffle(uniq([ans, '{ ' + wrong1.join(', ') + ' }', '{ ' + wrong2.join(', ') + ' }']), rand),
+        why: q.answer.map(function (x) { return x + ': ' + q.reasons[x]; }).join('. ') + '.',
+        check: function (text) { return P.checkFirstFollow(q, String(text).replace(/[{}]/g, ' '), s.g.terminals).correct; } });
+    });
+    /* goto targets */
+    P.itemsRound(s.an, rand, 2).forEach(function (q) {
+      var ans = 'I' + q.to, opts = shuffle(uniq([ans].concat(shuffle(s.an.lr0.states.map(function (I) { return 'I' + I.id; }), rand).slice(0, 4))).slice(0, 4), rand);
+      if (opts.indexOf(ans) < 0) opts[0] = ans;
+      qs.push({ stage: 'items', kind: 'state', prompt: 'goto(I' + q.from + ', ' + q.sym + ') = ?', answer: ans, options: shuffle(opts, rand), why: q.explain,
+        check: function (text) { return String(text).trim().toUpperCase().replace(/^(\d)/, 'I$1') === ans; } });
+    });
+    /* table cells */
+    P.tableRound(s.an, rand, 4).forEach(function (q) {
+      var ans = q.answer || 'blank';
+      var row = t.terminals.concat(t.nonTerminals).map(function (c) { return SLR.cellText(t, q.state, c); }).filter(Boolean);
+      var opts = uniq([ans].concat(row, ['blank', 'acc', 's' + (q.state + 1), 'r1'])).slice(0, 6);
+      qs.push({ stage: 'table', kind: 'cell', prompt: (q.table === 'goto' ? 'GOTO' : 'ACTION') + '[' + q.state + ', ' + q.sym + '] = ?', answer: ans, state: q.state, sym: q.sym,
+        options: shuffle(opts.slice(0, 4).indexOf(ans) >= 0 ? opts.slice(0, 4) : [ans].concat(opts.slice(1, 4)), rand), why: q.reason,
+        check: function (text) { return P.checkCell(q.answer, /^blank$/i.test(String(text).trim()) ? '' : text).correct; } });
+    });
+    /* SLR(1)? */
+    var sq = P.slrQuestion(s.an);
+    qs.push({ stage: 'conflicts', kind: 'yn', prompt: 'Is this grammar SLR(1)?', answer: sq.answer ? 'Yes' : 'No', options: ['Yes', 'No'], why: sq.explain,
+      check: function (text) { return /^y/i.test(String(text).trim()) === sq.answer; } });
+    /* parse moves */
+    if (s.sim) {
+      var pr = P.parseRound(s.an, s.tokens);
+      [1, 3, 6, 8].filter(function (i) { return i < pr.questions.length; }).forEach(function (i) {
+        var q = pr.questions[i], st = s.sim.steps[i], ans = q.answer || 'err';
+        var opts = uniq([ans, 'acc'].concat(t.terminals.concat(t.nonTerminals).map(function (c) { return SLR.cellText(t, st.cell.state, c); }).filter(function (x) { return /^[sr]/.test(x); }))).slice(0, 4);
+        ['s4', 'r2', 's6', 'r4', 's5'].forEach(function (x) { if (opts.length < 4 && opts.indexOf(x) < 0) opts.push(x); });
+        qs.push({ stage: 'parse', kind: 'move', prompt: 'Stack ' + Core.stackText(st.stack) + ' · input ' + st.input.slice(st.ip).join(' ') + ' · next move?', answer: ans, step: i,
+          options: shuffle(uniq(opts), rand), why: q.reason,
+          check: function (text) { return P.checkMove(q, text).correct; } });
+      });
+    }
+    return qs;
+  }
+
+  root.Lesson = { steps: steps, questions: questions, STAGE: STAGE };
+})(this);
+
+</script><script>
+/*
+ * rows.js — production-by-production grammar input, shared by the templates.
+ *
+ * The student sets the number of productions and fills one row per production
+ * (left side → right side), the way lab programs ask for a grammar. A text mode
+ * stays available for pasting, and both views are kept in sync.
+ *
+ * Markup uses neutral class names (pe-*); each template styles them its own way.
+ *
+ *   var ed = new ProductionEditor(hostEl, { onBuild: function (cfg) {...}, initial: cfg });
+ *   ed.getCfg()   -> { grammar, input, spaceOnly }
+ *   ed.setCfg(cfg)
+ *   ed.showError(msg)
+ */
+(function (root) {
+  'use strict';
+
+  var esc = function (x) { return root.Core.esc(x); };
+  var ARROW = /\s*(?:-->|->|→|::=)\s*/;
+  var MAX_ROWS = 40;
+
+  /* ---------- text <-> rows ---------- */
+
+  function rowsFromText(text) {
+    var rows = [], last = null;
+    root.Grammar.normalize(text).split(/\r?\n/).forEach(function (line) {
+      var clean = line.replace(/\/\/.*$/, '').trim();
+      if (!clean) return;
+      var alts;
+      if (ARROW.test(clean)) {
+        var parts = clean.split(ARROW);
+        last = parts[0].trim();
+        alts = parts.slice(1).join('->').split('|');
+      } else if (clean[0] === '|' && last) {
+        alts = clean.slice(1).split('|');
+      } else {
+        rows.push({ lhs: '', rhs: clean });
+        return;
+      }
+      alts.forEach(function (a) { rows.push({ lhs: last, rhs: a.trim() || 'ε' }); });
+    });
+    return rows.length ? rows : [{ lhs: '', rhs: '' }];
+  }
+
+  /* One line per row; the start symbol's rows go first because the first rule names the start. */
+  function textFromRows(rows, start) {
+    var filled = rows.filter(function (r) { return r.lhs.trim() || r.rhs.trim(); });
+    var first = filled.filter(function (r) { return r.lhs.trim() === start; });
+    var rest = filled.filter(function (r) { return r.lhs.trim() !== start; });
+    return first.concat(rest).map(function (r) { return r.lhs.trim() + ' -> ' + (r.rhs.trim() || 'ε'); }).join('\n');
+  }
+
+  /* Per-row problems, the symbols found, and how each right side was read. */
+  function check(rows, spaceOnly) {
+    var errs = rows.map(function () { return null; });
+    var lhsSet = [];
+    rows.forEach(function (r, i) {
+      var L = r.lhs.trim(), R = r.rhs.trim();
+      if (!L && !R) return;
+      if (!L) errs[i] = 'The left side is empty.';
+      else if (/\s/.test(L)) errs[i] = 'The left side must be one non-terminal, without spaces.';
+      else if (L === '$' || /(^|\s)\$(\s|$)/.test(R) || R.indexOf('$') >= 0) errs[i] = '$ is reserved for the end of input.';
+      else if (lhsSet.indexOf(L) < 0) lhsSet.push(L);
+    });
+    var parsed = null, error = null;
+    var anyFilled = rows.some(function (r) { return r.lhs.trim(); });
+    if (anyFilled && !errs.some(Boolean)) {
+      try { parsed = root.Grammar.parseGrammar(textFromRows(rows, (rows.find(function (r) { return r.lhs.trim(); }) || {}).lhs.trim()), { spaceOnly: spaceOnly }); }
+      catch (e) { error = e.message; }
+    }
+    var readAs = rows.map(function (r) {
+      if (!parsed || !r.lhs.trim()) return null;
+      var syms = [];
+      try {
+        var one = root.Grammar.parseGrammar(r.lhs.trim() + ' -> ' + (r.rhs.trim() || 'ε') + '\n' + lhsSet.filter(function (x) { return x !== r.lhs.trim(); }).map(function (x) { return x + ' -> ' + x; }).join('\n'), { spaceOnly: spaceOnly });
+        syms = one.productions[1].rhs;
+      } catch (e) { return null; }
+      var typed = r.rhs.trim().split(/\s+/).filter(Boolean);
+      return syms.join(' ') !== typed.join(' ') ? (syms.length ? syms.join(' ') : 'ε') : null;
+    });
+    var undefinedNT = [];
+    if (parsed) {
+      parsed.terminals.forEach(function (t) { if (/^[A-Z][A-Za-z0-9']*$/.test(t) && undefinedNT.indexOf(t) < 0) undefinedNT.push(t); });
+    }
+    return { errs: errs, parsed: parsed, error: error, nts: lhsSet, readAs: readAs, undefinedNT: undefinedNT };
+  }
+
+  /* ---------- component ---------- */
+
+  function ProductionEditor(host, opts) {
+    this.host = host;
+    this.opts = opts || {};
+    this.rows = [{ lhs: '', rhs: '' }];
+    this.start = '';
+    this.textMode = false;
+    this.render();
+    this.bind();
+    if (this.opts.initial) this.setCfg(this.opts.initial);
+  }
+
+  ProductionEditor.prototype.render = function () {
+    var ex = root.Core.examples();
+    this.host.innerHTML =
+      '<div class="pe">' +
+        '<div class="pe-top">' +
+          (this.opts.dynamic ? '<div class="pe-count pe-dyn"><span class="pe-label">Productions</span><span class="pe-hint" style="margin:0">Type in the last row and a new one appears.</span></div>' : '<div class="pe-count"><label class="pe-label" for="' + this.id('count') + '">Number of productions</label>' +
+            '<div class="pe-stepper"><button type="button" data-pe="dec" aria-label="One production fewer">−</button>' +
+            '<input type="number" inputmode="numeric" min="1" max="' + MAX_ROWS + '" id="' + this.id('count') + '">' +
+            '<button type="button" data-pe="inc" aria-label="One production more">+</button></div></div>') +
+          '<div class="pe-tools">' +
+            '<select class="pe-examples" aria-label="Load an example grammar"><option value="">Load a grammar…</option>' +
+              ex.map(function (e) { return '<option value="' + e.id + '">' + esc(e.title) + '</option>'; }).join('') + '</select>' +
+            '<button type="button" class="pe-mode" aria-pressed="false">Text mode</button>' +
+          '</div>' +
+        '</div>' +
+        '<ol class="pe-rows"></ol>' +
+        '<textarea class="pe-text" rows="7" spellcheck="false" aria-label="Grammar as text" hidden></textarea>' +
+        '<p class="pe-hint pe-text-hint" hidden>One rule per line, <code>|</code> for alternatives. Switching back splits every alternative into its own row.</p>' +
+        '<div class="pe-meta">' +
+          '<label class="pe-label">Start symbol <select class="pe-start"></select></label>' +
+          '<div class="pe-syms"></div>' +
+        '</div>' +
+        '<div class="pe-input">' +
+          '<label class="pe-label" for="' + this.id('w') + '">Input string</label>' +
+          '<input type="text" class="pe-w" id="' + this.id('w') + '" spellcheck="false" autocomplete="off" placeholder="e.g. id + id * id">' +
+          '<div class="pe-keys" aria-label="Tap a terminal to add it to the input"></div>' +
+        '</div>' +
+        '<label class="pe-space"><input type="checkbox" class="pe-sp"> Every space-separated word is one symbol</label>' +
+        '<p class="pe-error" role="alert" hidden></p>' +
+        '<button type="button" class="pe-build">Build parser</button>' +
+      '</div>';
+    this.$ = function (sel) { return this.host.querySelector(sel); };
+  };
+
+  ProductionEditor.prototype.id = function (k) {
+    if (!this._uid) this._uid = 'pe' + Math.random().toString(36).slice(2, 8);
+    return this._uid + '-' + k;
+  };
+
+  ProductionEditor.prototype.paintRows = function () {
+    var self = this;
+    var ol = this.$('.pe-rows');
+    var focusKey = document.activeElement && document.activeElement.getAttribute('data-k');
+    var caret = document.activeElement && document.activeElement.selectionStart;
+    ol.innerHTML = this.rows.map(function (r, i) {
+      return '<li class="pe-row" data-i="' + i + '">' +
+        '<span class="pe-n">(' + (i + 1) + ')</span>' +
+        '<input type="text" class="pe-lhs" data-k="l' + i + '" value="' + esc(r.lhs) + '" spellcheck="false" autocomplete="off" aria-label="Left side of production ' + (i + 1) + '" placeholder="' + (self.opts.dynamic && i === self.rows.length - 1 ? 'new' : 'A') + '">' +
+        '<span class="pe-arrow" aria-hidden="true">→</span>' +
+        '<input type="text" class="pe-rhs" data-k="r' + i + '" value="' + esc(r.rhs) + '" spellcheck="false" autocomplete="off" aria-label="Right side of production ' + (i + 1) + '" placeholder="' + (self.opts.dynamic && i === self.rows.length - 1 ? 'type a production here, e.g.  a A' : 'α') + '">' +
+        '<button type="button" class="pe-eps" data-i="' + i + '" title="Empty right side" aria-label="Set production ' + (i + 1) + ' to epsilon">ε</button>' +
+        '<button type="button" class="pe-del" data-i="' + i + '" aria-label="Remove production ' + (i + 1) + '"' + (self.rows.length < 2 ? ' disabled' : '') + '>×</button>' +
+        '<p class="pe-note" hidden></p>' +
+      '</li>';
+    }).join('');
+    var num = this.$('input[type=number]'); if (num) num.value = this.rows.length;
+    if (focusKey) {
+      var el = ol.querySelector('[data-k="' + focusKey + '"]');
+      if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) { /* number inputs */ } }
+    }
+    this.validate();
+  };
+
+  /* Dynamic mode keeps exactly one empty row at the end. */
+  ProductionEditor.prototype.tidy = function () {
+    if (!this.opts.dynamic) return false;
+    var r = this.rows, changed = false;
+    while (r.length > 1 && !r[r.length - 1].lhs.trim() && !r[r.length - 1].rhs.trim() && !r[r.length - 2].lhs.trim() && !r[r.length - 2].rhs.trim()) { r.pop(); changed = true; }
+    var last = r[r.length - 1];
+    if (last.lhs.trim() || last.rhs.trim()) { r.push({ lhs: '', rhs: '' }); changed = true; }
+    return changed;
+  };
+
+  ProductionEditor.prototype.validate = function () {
+    var res = check(this.rows, this.$('.pe-sp').checked);
+    var self = this;
+    this.lastCheck = res;
+    this.host.querySelectorAll('.pe-row').forEach(function (li, i) {
+      var note = li.querySelector('.pe-note');
+      var err = res.errs[i];
+      li.classList.toggle('pe-bad', !!err);
+      if (err) { note.hidden = false; note.className = 'pe-note pe-note-err'; note.textContent = err; }
+      else if (res.readAs[i]) { note.hidden = false; note.className = 'pe-note'; note.textContent = 'read as: ' + self.rows[i].lhs.trim() + ' → ' + res.readAs[i]; }
+      else note.hidden = true;
+    });
+    /* start symbol choices */
+    var sel = this.$('.pe-start');
+    if (!res.nts.length) this.start = '';
+    else if (res.nts.indexOf(this.start) < 0) this.start = res.nts[0];
+    sel.innerHTML = res.nts.map(function (n) { return '<option' + (n === self.start ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') || '<option value="">—</option>';
+    /* symbols and warnings */
+    var syms = '';
+    if (res.parsed) {
+      syms += '<div><span class="pe-label">Non-terminals</span>' + res.parsed.nonTerminals.slice(1).map(function (x) { return '<span class="pe-chip pe-nt">' + esc(x) + '</span>'; }).join('') + '</div>';
+      syms += '<div><span class="pe-label">Terminals</span>' + res.parsed.terminals.map(function (x) { return '<span class="pe-chip pe-t">' + esc(x) + '</span>'; }).join('') + '</div>';
+      if (res.undefinedNT.length) syms += '<p class="pe-warn">' + res.undefinedNT.map(esc).join(', ') + (res.undefinedNT.length > 1 ? ' look like non-terminals but have' : ' looks like a non-terminal but has') + ' no production, so ' + (res.undefinedNT.length > 1 ? 'they are' : 'it is') + ' treated as terminal' + (res.undefinedNT.length > 1 ? 's' : '') + '.</p>';
+    } else if (res.error) syms = '<p class="pe-warn">' + esc(res.error) + '</p>';
+    this.$('.pe-syms').innerHTML = syms;
+    /* terminal keys for the input string */
+    var keys = res.parsed ? res.parsed.terminals : [];
+    this.$('.pe-keys').innerHTML = keys.map(function (t) { return '<button type="button" class="pe-key" data-t="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') +
+      (keys.length ? '<button type="button" class="pe-key pe-key-fn" data-fn="back" aria-label="Remove the last token">⌫</button><button type="button" class="pe-key pe-key-fn" data-fn="clear">Clear</button>' : '');
+    return res;
+  };
+
+  ProductionEditor.prototype.setCount = function (n) {
+    n = Math.max(1, Math.min(MAX_ROWS, n | 0));
+    while (this.rows.length < n) this.rows.push({ lhs: '', rhs: '' });
+    if (this.rows.length > n) this.rows.length = n;
+    this.paintRows();
+  };
+
+  ProductionEditor.prototype.setTextMode = function (on) {
+    if (on === this.textMode) return;
+    if (on) this.$('.pe-text').value = textFromRows(this.rows, this.start);
+    else { this.rows = rowsFromText(this.$('.pe-text').value); this.paintRows(); }
+    this.textMode = on;
+    this.$('.pe-mode').setAttribute('aria-pressed', on);
+    this.$('.pe-mode').textContent = on ? 'Row mode' : 'Text mode';
+    this.$('.pe-rows').hidden = on;
+    this.$('.pe-text').hidden = !on;
+    this.$('.pe-text-hint').hidden = !on;
+    this.$('.pe-count').classList.toggle('pe-off', on);
+  };
+
+  ProductionEditor.prototype.getCfg = function () {
+    if (this.textMode) { this.rows = rowsFromText(this.$('.pe-text').value); this.validate(); }
+    return { grammar: textFromRows(this.rows, this.start), input: this.$('.pe-w').value, spaceOnly: this.$('.pe-sp').checked };
+  };
+
+  ProductionEditor.prototype.setCfg = function (cfg) {
+    this.rows = rowsFromText(cfg.grammar || '');
+    this.start = (this.rows[0] || {}).lhs || '';
+    this.tidy();
+    this.$('.pe-w').value = cfg.input || '';
+    this.$('.pe-sp').checked = !!cfg.spaceOnly;
+    if (this.textMode) this.$('.pe-text').value = textFromRows(this.rows, this.start);
+    this.paintRows();
+  };
+
+  ProductionEditor.prototype.showError = function (msg) {
+    var p = this.$('.pe-error');
+    p.hidden = !msg;
+    p.textContent = msg || '';
+  };
+
+  ProductionEditor.prototype.bind = function () {
+    var self = this, h = this.host;
+    h.addEventListener('input', function (e) {
+      var li = e.target.closest('.pe-row');
+      if (li) {
+        var i = +li.getAttribute('data-i');
+        if (e.target.classList.contains('pe-lhs')) self.rows[i].lhs = e.target.value;
+        if (e.target.classList.contains('pe-rhs')) self.rows[i].rhs = e.target.value;
+        if (self.tidy()) self.paintRows(); else self.validate();
+      }
+      if (e.target.type === 'number' && e.target.value !== '') self.setCount(+e.target.value);
+    });
+    h.addEventListener('change', function (e) {
+      if (e.target.classList.contains('pe-start')) self.start = e.target.value;
+      if (e.target.classList.contains('pe-sp')) self.validate();
+      if (e.target.classList.contains('pe-examples') && e.target.value) {
+        var ex = root.Core.example(e.target.value);
+        e.target.value = '';
+        self.setCfg({ grammar: ex.grammar, input: ex.input, spaceOnly: false });
+        if (self.opts.onExample) self.opts.onExample(ex);
+        self.build();
+      }
+    });
+    h.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      var pe = b.getAttribute('data-pe');
+      if (pe === 'inc') self.setCount(self.rows.length + 1);
+      if (pe === 'dec') self.setCount(self.rows.length - 1);
+      if (b.classList.contains('pe-eps')) { self.rows[+b.getAttribute('data-i')].rhs = 'ε'; self.tidy(); self.paintRows(); }
+      if (b.classList.contains('pe-del')) { self.rows.splice(+b.getAttribute('data-i'), 1); if (!self.rows.length) self.rows.push({ lhs: '', rhs: '' }); self.tidy(); self.paintRows(); }
+      if (b.classList.contains('pe-mode')) self.setTextMode(!self.textMode);
+      if (b.classList.contains('pe-key')) {
+        var w = self.$('.pe-w'), toks = w.value.trim() ? w.value.trim().split(/\s+/) : [];
+        if (b.getAttribute('data-fn') === 'back') toks.pop();
+        else if (b.getAttribute('data-fn') === 'clear') toks = [];
+        else toks.push(b.getAttribute('data-t'));
+        w.value = toks.join(' ');
+      }
+      if (b.classList.contains('pe-build')) self.build();
+    });
+    h.addEventListener('keydown', function (e) {
+      /* Enter in a row moves to the next field, adding a row at the end; Ctrl+Enter builds. */
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); self.build(); return; }
+      if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+      if (e.target.classList.contains('pe-w')) { e.preventDefault(); self.build(); return; }
+      var li = e.target.closest('.pe-row');
+      if (!li) return;
+      e.preventDefault();
+      var i = +li.getAttribute('data-i');
+      if (e.target.classList.contains('pe-lhs')) { li.querySelector('.pe-rhs').focus(); return; }
+      if (i === self.rows.length - 1) { self.rows.push({ lhs: self.rows[i].lhs, rhs: '' }); self.paintRows(); }
+      var next = h.querySelector('.pe-row[data-i="' + (i + 1) + '"] .pe-rhs');
+      if (next) next.focus();
+    });
+  };
+
+  ProductionEditor.prototype.build = function () {
+    var res = this.textMode ? null : this.validate();
+    if (res && res.errs.some(Boolean)) { this.showError('Fix the highlighted production first.'); return; }
+    var cfg = this.getCfg();
+    if (!cfg.grammar.trim()) { this.showError('Enter at least one production.'); return; }
+    this.showError('');
+    if (this.opts.onBuild) this.opts.onBuild(cfg);
+  };
+
+  root.ProductionEditor = ProductionEditor;
+  root.ProductionRows = { rowsFromText: rowsFromText, textFromRows: textFromRows, check: check };
+})(this);
+
+</script><script>
+/*
+ * spoiler.js — a short answer hidden under drifting specks until it is clicked.
+ * Plain-JS port of the kokonutui "Spoiler Text" template (templates/spoiler-text.tsx),
+ * cut down to single-line answers such as a table cell.
+ *
+ *   <span class="spoil" role="button" tabindex="0"><span class="spoil-t">s4</span></span>
+ *   Spoiler.scan(rootEl, onReveal)   wires every closed .spoil inside rootEl;
+ *                                    onReveal(el) runs once when one is opened.
+ *
+ * One animation loop serves every spoiler on the page and stops when none is left,
+ * so a table with many hidden cells stays cheap.
+ */
+(function (root) {
+  'use strict';
+
+  var DENSITY = 1 / 6;   // specks per square pixel, like the grain on a scratch card
+  var MAX_SPECKS = 600;
+  var DRIFT = 7;         // px per second while shimmering in place
+  var WAVE_MS = 520;     // the reveal wave crosses the spoiler in this long
+  var FADE_MS = 360;     // a speck fades over this long once the wave passes it
+  var THROW = 70;
+
+  var live = [], frame = 0, last = 0;
+  var reduced = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function makeSpecks(w, h) {
+    var n = Math.min(MAX_SPECKS, Math.round(w * h * DENSITY)), out = [];
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, v = DRIFT * (0.3 + Math.random() * 0.7);
+      out.push({ x: Math.random() * w, y: Math.random() * h, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+        phase: Math.random(), rate: 0.35 + Math.random() * 0.9, size: Math.random() < 0.18 ? 1.5 : 1, hit: 0 });
+    }
+    return out;
+  }
+
+  function layout(sp) {
+    var w = sp.el.offsetWidth, h = sp.el.offsetHeight, dpr = Math.min(root.devicePixelRatio || 1, 2);
+    sp.w = w; sp.h = h;
+    sp.c.width = Math.round(w * dpr); sp.c.height = Math.round(h * dpr);
+    sp.c.style.width = w + 'px'; sp.c.style.height = h + 'px';
+    sp.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    sp.specks = makeSpecks(w, h);
+  }
+
+  /* Moves one speck a frame on; returns its opacity, 0 once it has faded. */
+  function step(s, sp, now, dt, radius) {
+    var wave = sp.wave;
+    if (wave && !s.hit && Math.hypot(s.x - wave.x, s.y - wave.y) <= radius) {
+      s.hit = now;
+      var dx = s.x - wave.x, dy = s.y - wave.y, len = Math.hypot(dx, dy) || 1, push = THROW * (0.5 + Math.random());
+      s.vx += dx / len * push; s.vy += dy / len * push;
+    }
+    var fade = s.hit ? 1 - (now - s.hit) / FADE_MS : 1;
+    if (fade <= 0) return 0;
+    if (!reduced || s.hit) {
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      s.phase = (s.phase + s.rate * dt) % 1;
+    }
+    if (!s.hit) { /* until hit, a speck bounces around inside the patch */
+      if (s.x < 0 || s.x > sp.w) { s.vx = -s.vx; s.x = Math.min(sp.w, Math.max(0, s.x)); }
+      if (s.y < 0 || s.y > sp.h) { s.vy = -s.vy; s.y = Math.min(sp.h, Math.max(0, s.y)); }
+    }
+    return (0.35 + 0.65 * Math.abs(Math.sin(s.phase * Math.PI))) * fade * 0.9;
+  }
+
+  function tick(now) {
+    var dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+    last = now;
+    live = live.filter(function (sp) { return sp.el.isConnected && !sp.done; });
+    live.forEach(function (sp) {
+      var ctx = sp.ctx, alive = 0, radius = -1;
+      ctx.clearRect(0, 0, sp.w, sp.h);
+      ctx.fillStyle = getComputedStyle(sp.el).color;
+      if (sp.wave) {
+        var t = Math.min(1, (now - sp.wave.start) / WAVE_MS), x = sp.wave.x, y = sp.wave.y;
+        radius = Math.max(Math.hypot(x, y), Math.hypot(sp.w - x, y), Math.hypot(x, sp.h - y), Math.hypot(sp.w - x, sp.h - y)) * (1 - Math.pow(1 - t, 3));
+      }
+      sp.specks.forEach(function (s) {
+        var alpha = step(s, sp, now, dt, radius);
+        if (alpha > 0) { alive++; ctx.globalAlpha = alpha; ctx.fillRect(s.x, s.y, s.size, s.size); }
+      });
+      ctx.globalAlpha = 1;
+      if (sp.wave && !alive) { sp.done = true; sp.c.remove(); }
+    });
+    if (live.some(function (sp) { return !reduced || sp.wave; })) frame = requestAnimationFrame(tick);
+    else frame = 0;
+  }
+
+  function start() { if (!frame) { last = 0; frame = requestAnimationFrame(tick); } }
+
+  function reveal(sp, clientX, clientY) {
+    if (sp.wave) return;
+    var r = sp.el.getBoundingClientRect();
+    /* A keyboard reveal starts from the left edge. */
+    sp.wave = { x: clientX == null ? 4 : clientX - r.left, y: clientY == null ? r.height / 2 : clientY - r.top, start: performance.now() };
+    sp.el.classList.add('open');
+    ['role', 'tabindex', 'aria-label'].forEach(function (a) { sp.el.removeAttribute(a); });
+    var t = sp.el.querySelector('.spoil-t'); if (t) t.removeAttribute('aria-hidden');
+    if (sp.onReveal) sp.onReveal(sp.el);
+    start();
+  }
+
+  function setup(el, onReveal) {
+    if (el._spoil) return;
+    var c = document.createElement('canvas');
+    c.className = 'spoil-c';
+    c.setAttribute('aria-hidden', 'true');
+    el.appendChild(c);
+    var sp = { el: el, c: c, ctx: c.getContext('2d'), wave: null, onReveal: onReveal };
+    el._spoil = sp;
+    layout(sp);
+    live.push(sp);
+    el.addEventListener('click', function (e) { if (e.detail) reveal(sp, e.clientX, e.clientY); else reveal(sp); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(sp); } });
+  }
+
+  function scan(rootEl, onReveal) {
+    Array.prototype.forEach.call(rootEl.querySelectorAll('.spoil:not(.open)'), function (el) { setup(el, onReveal); });
+    if (live.length) start();
+  }
+
+  root.Spoiler = { scan: scan };
+})(this);
+
+</script>
+<script>
+(function(){'use strict';
+/* PEEK: after Check in Practice, each wrong answer gets its correct entry hidden
+   under spoiler specks; click to peek. Set to false to go back to plain marking. */
+var PEEK=true;
+/* PARTIAL: in Practice, Check marks only what was entered; answers left empty are
+   counted as "not filled yet" instead of wrong. Set to false to mark every cell. */
+var PARTIAL=true;
+/* TEACH_NAV: Teach mode gets "Play" (steps by itself) and "Next section" (skips to
+   the next part of the worksheet). Set to false to keep only Back / Next step. */
+var TEACH_NAV=true;
+var $=function(q){return document.querySelector(q)},esc=Core.esc;
+var s=null,STEPS=[],M={mode:'teach',k:0,score:0,tries:0,answered:{}};
+
+/* ---------- build from the input card ---------- */
+var editor=new ProductionEditor($('#editor'),{onBuild:build,dynamic:true});
+function build(cfg){
+  var r=Core.build(cfg);
+  if(!r.ok){editor.showError(r.error);return}
+  if(r.s.tokenError)editor.showError(r.s.tokenError+' The construction is still shown; fix the input to see the parse.');else editor.showError('');
+  stopPlay();s=r.s;STEPS=Lesson.steps(s);M.k=0;M.score=0;M.answered={};PS.practice=freshP();PS.test=freshP();P=PS[M.mode]||PS.practice;
+  $('#summary').innerHTML='<b>'+esc(s.g.productions.slice(1).map(function(p){return SLR.prodStr(p)}).join('   ·   '))+'</b><br>input: '+esc(s.tokens?s.tokens.join(' '):'(invalid)')+'  <button type="button" class="btn line" id="edit" style="margin-left:10px">Edit</button>';
+  render();
+}
+
+/* ---------- worksheet at step k ----------
+   teach: steps 0..k are written, step k in fresh ink.
+   practice (ask): steps 0..k-1 are written, the place of step k shows "?". */
+function local(stage,upto){var n=-1;for(var i=0;i<=upto;i++)if(STEPS[i].stage===stage)n++;return n}
+function ink(t,fresh){return '<span class="ink'+(fresh?' write':'')+'">'+esc(t)+'</span>'}
+var ASK='<span class="ask">?</span>';
+function sheet(){
+  var ask=M.mode==='practice'&&!M.answered[M.k],k=M.k,upto=ask?k-1:k,st=STEPS[k],fresh=function(stage){return !ask&&st.stage===stage};
+  var note=function(stage){return !ask&&st.stage===stage?'<div class="note">'+esc(st.text)+'</div>':''};
+  var h='<div class="head"><h1>SLR(1) parsing</h1><p class="g">'+esc(s.g.productions.slice(1).map(function(p){return SLR.prodStr(p)}).join('    '))+'</p></div>';
+  /* Q1 */
+  h+='<h2 class="q">1. Augmented grammar <small>productions numbered from 0</small></h2><div class="qb">'+Core.prods(s).map(function(p){return '<div class="prod">('+p.index+')  '+(p.index===0?(upto>=0?ink(p.text,fresh('grammar')):(ask&&st.stage==='grammar'?ASK:'')):esc(p.text))+'</div>'}).join('')+note('grammar')+'</div>';
+  /* Q2 */
+  var fi=local('ff',upto),v=Core.ff(s,fi),fcur=st.stage==='ff'?s.an.ff.steps[st.ref.i]:null;
+  h+='<h2 class="q">2. FIRST and FOLLOW</h2><div class="qb"><table class="w"><tr><th></th><th>FIRST</th><th>FOLLOW</th></tr>'+v.rows.map(function(r){
+    function cell(kind,list){var here=fcur&&fcur.kind===kind&&fcur.of===r.nt,txt=list.length?'{ '+list.map(function(x){return x.sym}).join(', ')+' }':'';
+      return '<td style="min-width:210px" class="'+(here?'cur':'')+'">'+(txt?ink(txt,here&&!ask):'')+(here&&ask?' '+ASK:'')+'</td>'}
+    return '<tr><th>'+esc(r.nt)+'</th>'+cell('FIRST',fi<0?[]:r.first)+cell('FOLLOW',fi<0?[]:r.follow)+'</tr>'}).join('')+'</table>'+note('ff')+'</div>';
+  /* Q3 */
+  var ii=local('items',upto),it=ii<0?null:Core.items(s,ii),icur=st.stage==='items'?s.an.lr0.steps[st.ref.i]:null;
+  h+='<h2 class="q">3. Canonical collection of LR(0) items</h2><div class="qb"><div class="states">'+s.an.lr0.states.map(function(I){
+    var shown=it&&it.states.has(I.id),here=icur&&icur.state===I.id,info=Core.stateInfo(s,I.id);
+    var body=shown?info.items.map(function(l){return '<span class="ink'+(here&&!ask&&icur.type!=='existing'?' write':'')+'">'+esc(l.text)+'</span>'}).join(''):(here&&ask?'<div style="margin-top:8px">'+ASK+'</div>':'');
+    return '<div class="box'+(here?' cur':'')+'"><b>I'+I.id+'</b>'+body+'</div>'}).join('')+'</div>'+
+    (it?'<div class="trans">'+s.an.lr0.steps.slice(1,ii+1).map(function(x){return 'goto(I'+x.from+','+x.sym+')=I'+x.state}).join(' · ')+(icur&&ask&&icur.from!==null?' · goto(I'+icur.from+','+icur.sym+')=?':'')+'</div>':'')+note('items')+'</div>';
+  /* Q4 */
+  var ti=local('table',upto),t=Core.tableAt(s,ti),cols=t.terminals.concat(t.nonTerminals),tcur=st.stage==='table'?s.an.table.fills[st.ref.i]:null;
+  h+='<h2 class="q">4. SLR(1) parsing table</h2><div class="qb scroll"><table class="w c"><tr><th>state</th>'+cols.map(function(c){return '<th style="text-align:center">'+esc(c)+'</th>'}).join('')+'</tr>'+t.rows.map(function(r){return '<tr><th>'+r.state+'</th>'+r.cells.map(function(c){var here=tcur&&tcur.state===r.state&&tcur.sym===c.sym;
+    return '<td class="'+(here?'cur':'')+(c.kind==='conf'?' conf':'')+'">'+(c.text?ink(c.text,here&&!ask):'')+(here&&ask?ASK:'')+'</td>'}).join('')+'</tr>'}).join('')+'</table>'+note('table')+'</div>';
+  /* Q5 */
+  var cf=Core.conflicts(s),ci=STEPS.findIndex(function(x){return x.stage==='conflicts'});
+  h+='<h2 class="q">5. Is the grammar SLR(1)?</h2><div class="qb">Answer: <span class="blank'+(st.stage==='conflicts'?' cur':'')+'">'+(upto>=ci?ink(cf.isSLR?'Yes, no cell has two entries':'No: '+cf.list.map(function(x){return x.type+' in I'+x.state+' on '+x.sym}).join('; '),fresh('conflicts')):(ask&&st.stage==='conflicts'?ASK:''))+'</span>'+note('conflicts')+'</div>';
+  /* Q6 */
+  h+='<h2 class="q">6. Parse the input'+(s.tokens?' <span style="font-family:Cousine">'+esc(s.tokens.join(' '))+' $</span>':'')+'</h2><div class="qb">';
+  if(!s.sim)h+='<p class="err">'+esc(s.tokenError||'No input string.')+'</p>';
+  else{var pi=local('parse',upto),pcur=st.stage==='parse'?st.ref.i:-1,all=Core.traceRows(s);
+    h+='<table class="w"><tr><th>#</th><th>Stack</th><th>Input</th><th>Action</th></tr>'+all.map(function(r,i){var show=i<=pi,here=i===pcur,fr=here&&!ask;
+      return '<tr class="'+(here?'cur':'')+'"><td>'+r.n+'</td><td style="min-width:220px">'+(show||here?ink(r.stack,fr):'')+'</td><td style="min-width:120px">'+(show||here?ink(r.input,fr):'')+'</td><td style="min-width:180px">'+(show?ink(r.action,fr):here&&ask?ASK:'')+'</td></tr>'}).join('')+'</table>';
+    var last=s.sim.steps[s.sim.steps.length-1];if(pi===all.length-1)h+='<p>'+ink(last.type==='accept'?'Accepted ✓':'Rejected: unexpected '+last.error.symbol,fresh('parse'))+'</p>'}
+  return h+note('parse')+'</div>';
+}
+
+/* ---------- step-by-step practice: the student does step k ---------- */
+function question(st){var r=st.ref;
+  if(st.stage==='ff'){var x=s.an.ff.steps[r.i];return {q:'Which symbol is added next to '+x.kind+'('+x.of+')?',hint:'Use the rules for '+x.kind+'. Type the symbol (eps for ε).',ans:x.sym,check:function(a){a=a.trim();return a===x.sym||(x.sym==='ε'&&/^(eps|epsilon|e|ε|#)$/i.test(a))}}}
+  if(st.stage==='items'){var y=s.an.lr0.steps[r.i];if(y.type==='start')return null;return {q:'goto(I'+y.from+', '+y.sym+') = ?',hint:'Move the dot over '+y.sym+'. Same kernel as an existing state? Then give that state. Otherwise the next new number.',ans:'I'+y.state,check:function(a){return a.trim().replace(/^i/i,'')===String(y.state)}}}
+  if(st.stage==='table'){var f=s.an.table.fills[r.i],e=SLR.entryStr(f.entry);return {q:(f.table==='goto'?'GOTO':'ACTION')+'['+f.state+', '+f.sym+'] = ?',hint:'Shift on goto with a terminal (sN), reduce only under FOLLOW (rN), accept on $ (acc), GOTO is a state number.',ans:e,check:function(a){return Practice.normalizeEntry(a)===Practice.normalizeEntry(e)}}}
+  if(st.stage==='conflicts'){var c=Core.conflicts(s);return {q:'Is the grammar SLR(1)? (yes / no)',hint:'Did any cell of the table get two entries?',ans:c.isSLR?'yes':'no',check:function(a){return /^y/i.test(a.trim())===c.isSLR&&/^[yn]/i.test(a.trim())}}}
+  if(st.stage==='parse'){var p=s.sim.steps[r.i],a2=p.type==='accept'?'acc':p.type==='error'?'err':p.action;return {q:'Stack '+Core.stackText(p.stack)+'  ·  next symbol '+p.input[p.ip]+'  ·  what is the next move?',hint:'Look up ACTION['+p.stack[p.stack.length-1].state+', '+p.input[p.ip]+']. Answer sN, rN, acc or err.',ans:a2,check:function(a){return Practice.normalizeEntry(a)===Practice.normalizeEntry(a2)}}}
+  return null}
+function pbar(){
+  var box=$('#pbar');if(M.mode!=='practice'){box.hidden=true;return}box.hidden=false;
+  var st=STEPS[M.k],q=question(st),done=M.answered[M.k];
+  if(!q){$('#pbar-in').innerHTML='<div class="qtext">'+esc(st.title)+'<small>'+esc(st.text)+'</small></div><button class="btn pri" id="pnext" type="button">Next step ▶</button>';return}
+  $('#pbar-in').innerHTML='<div class="qtext">Step '+(M.k+1)+' of '+STEPS.length+': '+esc(q.q)+'<small>'+esc(q.hint)+'</small></div>'+
+    (done?'<button class="btn pri" id="pnext" type="button">'+(M.k===STEPS.length-1?'Finish':'Next step ▶')+'</button>':'<form id="pform"><input id="pans" autocomplete="off" aria-label="Your answer"><button class="btn pri" type="submit">Check</button><button class="btn line" type="button" id="show">Show</button></form>')+
+    '<div class="fb" id="fb"></div>';
+  if(!done){var i=$('#pans');i.focus({preventScroll:true})}
+}
+function answer(text,reveal){
+  var st=STEPS[M.k],q=question(st),ok=!reveal&&q.check(text),fb=$('#fb');
+  if(ok||reveal){if(ok&&!M.tries)M.score++;M.answered[M.k]=true;M.tries=0;render();
+    var f=$('#fb');f.className='fb '+(ok?'ok':'bad');f.innerHTML=(ok?'✓ Correct. ':'The answer is <b>'+esc(q.ans)+'</b>. ')+'<span class="why">'+esc(st.text)+'</span>';return}
+  M.tries++;fb.className='fb bad';fb.innerHTML='✗ Not '+esc(text||'blank')+'. Try again, or press Show. <span class="why">'+esc(q.hint)+'</span>';
+}
+/* ---------- practice from scratch: the student fills the whole worksheet ----------
+   P.v holds what was typed (by input id); P.res[section] holds the marks after Check. */
+function freshP(){return {v:{},res:{},shown:{},nStates:1,nRows:1,want:{},peeked:{},t0:0,acc:0,begun:false,submitted:false,time:0,score:null}}
+var PS={practice:freshP(),test:freshP()},P=PS.practice;
+function TEST(){return M.mode==='test'}
+function locked(){return TEST()&&(P.submitted||!P.begun)}
+/* A test is active from Begin until Submit; Retake, Restart and a rebuilt grammar replace PS.test and end it. */
+function testActive(){return PS.test.begun&&!PS.test.submitted}
+function val(id){return (P.v[id]||'').trim()}
+function norm(t){return String(t).replace(/\s+/g,'').replace(/->|-->|::=/g,'→').replace(/\./g,'•').replace(/[’′']/g,"'")}
+function setOf(t){return Practice.parseSymbolSet(t,s.g.terminals).slice().sort().join(',')}
+function inp(id,w,ph){var r=P.res.cells&&P.res.cells[id];return '<input class="pin'+(r===true?' good':r===false?' wrong':'')+'" id="'+id+'" value="'+esc(P.v[id]||'')+'" style="width:'+(w||120)+'px" placeholder="'+(ph||'')+'" autocomplete="off" spellcheck="false"'+(locked()?' readonly':'')+'>'+peekFor(id,r)}
+/* The correct entry for a wrong answer, hidden until clicked (Practice only). */
+function peekFor(id,r){if(!PEEK||TEST()||r!==false||!(id in P.want))return '';var t=P.want[id]===''?'blank':P.want[id];
+  return P.peeked[id]?'<span class="spoil open" title="You peeked at this answer"><span class="spoil-t">'+esc(t)+'</span></span>'
+    :'<span class="spoil" data-peek="'+esc(id)+'" role="button" tabindex="0" aria-label="Hidden answer. Activate to peek." title="Click to peek at the answer"><span class="spoil-t" aria-hidden="true">'+esc(t)+'</span></span>'}
+function ctlRow(n){var r=P.res[n];if(TEST())return !P.submitted||!r?'':'<div class="pctl"><span class="pmark '+(r.ok===r.of?'ok':'bad')+'">'+r.ok+' / '+r.of+' correct</span></div>'+(r.notes.length?'<ul class="pnotes">'+r.notes.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'');return '<div class="pctl"><button class="btn pri" type="button" data-check="'+n+'">Check</button><button class="btn line" type="button" data-show="'+n+'">Show answer</button>'+(r?markLine(r):'')+'</div>'+(r&&r.notes.length?'<ul class="pnotes">'+r.notes.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'')}
+function itemsText(I){return Core.stateInfo(s,I.id).items.map(function(l){return l.text}).join('\n')}
+function practiceSheet(){
+  var g=s.g,t=s.an.table,cols=t.terminals.concat(t.nonTerminals),h='<div class="head"><h1>SLR(1) parsing · '+(TEST()?'test':'practice')+'</h1><p class="g">'+esc(g.productions.slice(1).map(function(p){return SLR.prodStr(p)}).join('    '))+'</p><p>'+(TEST()?'Solve the whole problem, then press Submit test at the bottom. Nothing is marked until you submit. The stopwatch only records how long you take; there is no time limit.':'Solve the whole problem yourself. Check each part when you are ready; wrong entries are marked with the reason.')+'</p></div>';
+  if(TEST()&&P.submitted)h+=resultCard();
+  if(TEST()&&!P.begun)h+='<div class="tbegin"><p>Read the grammar and input above. The answer boxes stay locked until you begin; the stopwatch starts when you press Begin.</p><button class="btn pri" type="button" id="tbegin">Begin test</button></div>';
+  h+='<h2 class="q">1. Augmented grammar <small>write the new production (0)</small></h2><div class="qb">(0) '+inp('p-aug',220,"S' -> S")+ctlRow(1)+'</div>';
+  h+='<h2 class="q">2. FIRST and FOLLOW <small>symbols separated by commas, eps for ε</small></h2><div class="qb"><table class="w"><tr><th></th><th>FIRST</th><th>FOLLOW</th></tr>'+g.nonTerminals.slice(1).map(function(A){return '<tr><th>'+esc(A)+'</th><td>'+inp('p-fi-'+A,200,'{ … }')+'</td><td>'+inp('p-fo-'+A,200,'{ … }')+'</td></tr>'}).join('')+'</table>'+ctlRow(2)+'</div>';
+  h+='<h2 class="q">3. Canonical collection of LR(0) items <small>one item per line, dot as . e.g. E -> E . + T</small></h2><div class="qb"><div class="states">';
+  for(var i=0;i<P.nStates;i++){var r=P.res.cells&&P.res.cells['p-st-'+i];h+='<div class="box'+(r===true?' good':r===false?' wrong':'')+'"><b>I'+i+'</b><textarea class="pta" id="p-st-'+i+'" rows="5" spellcheck="false"'+(locked()?' readonly':'')+'>'+esc(P.v['p-st-'+i]||'')+'</textarea></div>'}
+  h+='</div>'+(locked()?'':'<div class="pctl"><button class="btn line" type="button" id="addst">+ Add state</button>'+(P.nStates>1?'<button class="btn line" type="button" id="delst">− Remove last</button>':'')+'</div>')+ctlRow(3)+'</div>';
+  h+='<h2 class="q">4. SLR(1) parsing table <small>sN, rN, acc, a state number, or leave empty. Uses the standard numbering I0…I'+(s.an.lr0.states.length-1)+'</small></h2><div class="qb scroll"><table class="w c"><tr><th>state</th>'+cols.map(function(c){return '<th style="text-align:center">'+esc(c)+'</th>'}).join('')+'</tr>'+
+    s.an.lr0.states.map(function(I){return '<tr><th>'+I.id+'</th>'+cols.map(function(c){return '<td>'+inp('p-t-'+I.id+'-'+cols.indexOf(c),52)+'</td>'}).join('')+'</tr>'}).join('')+'</table>'+ctlRow(4)+'</div>';
+  h+='<h2 class="q">5. Is the grammar SLR(1)?</h2><div class="qb">'+inp('p-slr',120,'yes / no')+ctlRow(5)+'</div>';
+  h+='<h2 class="q">6. Parse the input'+(s.tokens?' <span style="font-family:Cousine">'+esc(s.tokens.join(' '))+' $</span>':'')+' <small>stack like 0 a 3, action sN / rN / acc</small></h2><div class="qb">';
+  if(!s.sim)h+='<p class="err">'+esc(s.tokenError||'No input string.')+'</p>';
+  else{h+='<table class="w"><tr><th>#</th><th>Stack</th><th>Input</th><th>Action</th></tr>';for(var k=0;k<P.nRows;k++)h+='<tr><td>'+(k+1)+'</td><td>'+inp('p-ps-'+k,220)+'</td><td>'+inp('p-pi-'+k,140)+'</td><td>'+inp('p-pa-'+k,90)+'</td></tr>';
+    h+='</table>'+(locked()?'':'<div class="pctl"><button class="btn line" type="button" id="addrow">+ Add row</button>'+(P.nRows>1?'<button class="btn line" type="button" id="delrow">− Remove last</button>':'')+'</div>')+ctlRow(6)}
+  var tot=0,ok=0;[1,2,3,4,5,6].forEach(function(n){if(P.res[n]){tot+=P.res[n].of;ok+=P.res[n].ok}});
+  if(TEST())return h+'</div>'+(!P.begun?'':P.submitted?'<div class="tsubmit"><p>Submitted. Time taken '+fmt(P.time)+'. The full worked solution is in Teach mode, and is included when you print or save as PDF.</p><button class="btn pri" type="button" id="tretake">Retake test</button></div>'+solutionPart():'<div class="tsubmit"><p>Done? Submitting marks every part and stops the stopwatch. You cannot change answers afterwards.</p><button class="btn pri" type="button" id="tsubmit">Submit test</button></div>');
+  return h+'</div>'+(tot?'<p class="ptotal">Total so far: '+ok+' / '+tot+'</p>':'');
+}
+/* ---------- test mode: stopwatch, submit, result ----------
+   P.acc is the time already counted, P.t0 when the running stretch began (0 = paused). */
+var NAMES=['','Augmented grammar','FIRST and FOLLOW','LR(0) item sets','Parsing table','SLR(1)?','Parse moves'];
+function elapsed(){return P.acc+(P.t0?Date.now()-P.t0:0)}
+function fmt(ms){var t=Math.floor(ms/1000),hh=Math.floor(t/3600),mm=Math.floor(t/60)%60,ss=t%60,p=function(x){return (x<10?'0':'')+x};return (hh?hh+':'+p(mm):p(mm))+':'+p(ss)}
+function startClock(){if(!P.submitted&&!P.t0)P.t0=Date.now()}
+function pauseClock(){if(P.t0){P.acc+=Date.now()-P.t0;P.t0=0}}
+function tick(){var c=$('#clock');if(c&&TEST()){c.textContent=fmt(P.submitted?P.time:elapsed());c.classList.toggle('paused',!P.t0&&!P.submitted)}}
+setInterval(tick,500);
+function submitTest(){
+  if(!confirm('Submit the test? Every part will be marked and you cannot change your answers afterwards.'))return;
+  P.time=elapsed();pauseClock();P.submitted=true;P.res={};
+  [1,2,3,4,5,6].forEach(function(n){if(n<6||s.sim)check(n,false)});
+  var ok=0,of=0;[1,2,3,4,5,6].forEach(function(n){if(P.res[n]){ok+=P.res[n].ok;of+=P.res[n].of}});
+  P.score={ok:ok,of:of};P.best=saveBest({ok:ok,of:of,ms:P.time});render();$('.tresult').scrollIntoView();
+}
+/* Keeps the better of this attempt and the stored best for this grammar; returns {r, isNew}. */
+function saveBest(cur){
+  var key=Practice.bestKey(s.g),prev=Practice.parseBest(Core.store(key));
+  if(cur.of>0&&Practice.isBetter(cur,prev)){Core.store(key,JSON.stringify(cur));return {r:cur,isNew:true}}
+  return prev?{r:prev,isNew:false}:null;
+}
+/* Print-only Part B: the finished worked solution, the same sheet Teach mode shows at its last step. */
+function solutionPart(){
+  var k=M.k;M.k=STEPS.length-1;var h=sheet();M.k=k;
+  return '<section class="solution printonly"><h2>Part B · Solution</h2>'+h+'</section>'}
+function resultCard(){var sc=P.score,pct=sc.of?Math.round(100*sc.ok/sc.of):0;
+  return '<h2 class="printonly">Part A · Your approach and marks</h2><div class="tresult"><h2>Test result</h2><span class="big">'+sc.ok+' / '+sc.of+'</span><span class="big'+(P.best&&P.best.isNew?' new':'')+'">'+pct+'%</span><span class="big">⏱ '+fmt(P.time)+'</span>'+
+    '<table>'+[1,2,3,4,5,6].filter(function(n){return P.res[n]}).map(function(n){var r=P.res[n];return '<tr><td>'+n+'. '+NAMES[n]+'</td><td class="pmark '+(r.ok===r.of?'ok':'bad')+'">'+r.ok+' / '+r.of+'</td></tr>'}).join('')+'</table>'+
+    (P.best?'<p class="best'+(P.best.isNew?' new':'')+'">'+(P.best.isNew?'🏆 New Best! You scored '+pct+'% in '+fmt(P.best.r.ms)+'.':'⭐ Your Best: '+Math.round(100*P.best.r.ok/P.best.r.of)+'% in '+fmt(P.best.r.ms)+'. Current attempt: '+pct+'%.')+'</p>':'')+
+    '<p class="noprint"><button class="btn line" type="button" data-print>Print / Save as PDF</button></p></div>'}
+function isDark(){var cur=document.documentElement.getAttribute('data-theme');return cur?cur==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
+function themeIcon(){$('#theme').textContent=isDark()?'☀ Light':'☾ Dark'}
+themeIcon();matchMedia('(prefers-color-scheme: dark)').addEventListener('change',themeIcon);
+function lenient(){return PARTIAL&&!TEST()}
+/* "8 / 45 correct · 2 wrong · 35 not filled yet" for a checked section. */
+function markLine(r){var parts=[r.ok+' / '+r.of+' correct'];
+  if(lenient()){if(r.wrong)parts.push(r.wrong+' wrong');if(r.blank)parts.push(r.blank+' not filled yet')}
+  if(r.peek)parts.push(r.peek+' right only after peeking, not counted');
+  return '<span class="pmark '+(r.ok===r.of?'ok':lenient()&&!r.wrong&&!r.peek?'todo':'bad')+'">'+parts.join(' · ')+'</span>'}
+function mark(id,ok){P.res.cells=P.res.cells||{};P.res.cells[id]=ok;return ok}
+function check(n,reveal){
+  var g=s.g,t=s.an.table,cols=t.terminals.concat(t.nonTerminals),ok=0,of=0,peek=0,wrong=0,blank=0,notes=[];
+  function one(id,good,want,why){of++;if(reveal){P.v[id]=want;mark(id,true);ok++;return}P.want[id]=want;if(!good&&lenient()&&!val(id)){mark(id,undefined);blank++;return}if(mark(id,good)){if(P.peeked[id])peek++;else ok++}else{wrong++;notes.push(why)}}
+  if(n===1){var want=g.augmentedStart+' -> '+g.start;one('p-aug',norm(val('p-aug'))===norm(want),want,'(0) should be '+SLR.prodStr(g.productions[0])+': a new start symbol that derives the old one.')}
+  if(n===2)g.nonTerminals.slice(1).forEach(function(A){['fi','fo'].forEach(function(k){var set=k==='fi'?s.an.ff.first[A]:s.an.ff.follow[A],keys=Object.keys(set),id='p-'+k+'-'+A,good=setOf(val(id))===keys.slice().sort().join(',');
+    one(id,good,'{ '+keys.map(function(x){return x==='ε'?'eps':x}).join(', ')+' }',(k==='fi'?'FIRST(':'FOLLOW(')+A+') = { '+keys.join(', ')+' }. '+keys.map(function(x){return x+': '+set[x].reason}).join('. ')+'.')})});
+  if(n===3){var states=s.an.lr0.states,want3=states.map(function(I){return Core.stateInfo(s,I.id).items.map(function(l){return norm(l.text)}).sort().join('|')});
+    if(reveal){P.nStates=states.length;states.forEach(function(I,i){P.v['p-st-'+i]=itemsText(I);mark('p-st-'+i,true)});ok=of=states.length}
+    else{var used={};for(var i=0;i<P.nStates;i++){var mine=val('p-st-'+i).split('\n').map(norm).filter(Boolean).sort().join('|'),hit=want3.indexOf(mine);if(!mine&&lenient()){mark('p-st-'+i,undefined);continue}of++;
+        if(hit>=0&&!used[hit]){used[hit]=1;ok++;mark('p-st-'+i,true)}else{wrong++;mark('p-st-'+i,false);notes.push('Your I'+i+(hit>=0?' repeats a state you already have.':' does not match any state. Check the closure: every item with the dot before a non-terminal brings in that non-terminal\'s productions.'))}}
+      var missing=states.length-Object.keys(used).length;if(missing>0){of+=missing;if(lenient())blank+=missing;else notes.push(missing+' state(s) still missing. There are '+states.length+' states in total.')}}}
+  if(n===4)states4();
+  function states4(){s.an.lr0.states.forEach(function(I){cols.forEach(function(c,ci){var id='p-t-'+I.id+'-'+ci,w=SLR.cellText(t,I.id,c),got=Practice.normalizeCell(val(id)),exp=Practice.normalizeCell(w),good=got!==null&&got.join('/')===exp.join('/');
+    if(!w&&!val(id)&&!reveal)return;/* empty cells left empty are not counted */
+    var why=(t.nonTerminals.indexOf(c)>=0?'GOTO':'ACTION')+'['+I.id+', '+c+'] = '+(w||'blank')+'. '+(Core.cellInfo(s,I.id,c).entries.map(function(e){return e.reason}).join(' ')||Core.cellInfo(s,I.id,c).blank);
+    one(id,good,w,why)})})}
+  if(n===5){var c=Core.conflicts(s);one('p-slr',/^[yn]/i.test(val('p-slr'))&&(/^y/i.test(val('p-slr'))===c.isSLR),c.isSLR?'yes':'no',c.isSLR?'Yes: no cell got two entries.':'No: '+c.list.map(function(x){return x.type+' in I'+x.state+' on '+x.sym}).join('; ')+'.')}
+  if(n===6&&s.sim){var rows=s.sim.steps;if(reveal)P.nRows=rows.length;
+    rows.forEach(function(st,k){if(k>=P.nRows)return;var tr=Core.traceRows(s)[k],act=st.type==='accept'?'acc':st.type==='error'?'err':st.action;
+      one('p-ps-'+k,norm(val('p-ps-'+k))===norm(tr.stack),tr.stack,'Row '+(k+1)+' stack is '+tr.stack+'.');
+      one('p-pi-'+k,norm(val('p-pi-'+k)).replace(/\$$/,'')===norm(tr.input).replace(/\$$/,''),tr.input,'Row '+(k+1)+' remaining input is '+tr.input+'.');
+      one('p-pa-'+k,Practice.normalizeEntry(val('p-pa-'+k))===Practice.normalizeEntry(act),act,'Row '+(k+1)+': '+st.reason+'.')});
+    if(!reveal&&P.nRows<rows.length){of+=rows.length-P.nRows;if(lenient())blank+=rows.length-P.nRows;else notes.push('The parse takes '+rows.length+' moves; you have '+P.nRows+' rows.')}
+    if(P.nRows>rows.length)notes.push('The parse ends after '+rows.length+' moves; extra rows are not needed.')}
+  P.res[n]={ok:ok,of:of,peek:peek,wrong:wrong,blank:blank,notes:notes.slice(0,12)};
+}
+/* ---------- chrome ---------- */
+function render(){
+  if(!s)return;
+  var t=M.mode==='teach',n=STEPS.length;
+  if(t)$('#ctl').innerHTML='<button class="btn" id="first" type="button">⏮</button> <button class="btn" id="prev" type="button">◀ Back</button> <span class="cnt">Step '+(M.k+1)+' of '+n+'</span> <button class="btn pri" id="next" type="button">Next step ▶</button>'+
+    (TEACH_NAV?' <button class="btn" id="nextsec" type="button">Next section ⏭</button> <button class="btn" id="play" type="button">'+(playTimer?'⏸ Pause':'▶ Play')+'</button>':'');
+  else if(TEST())$('#ctl').innerHTML='<span class="clock" id="clock" title="Time taken">'+fmt(P.submitted?P.time:elapsed())+'</span>'+(P.submitted?' <button class="btn" type="button" data-print>Print / Save as PDF</button>':'')+(P.begun&&!P.submitted?' <button class="btn" id="tpause" type="button">'+(P.t0?'Pause':'Resume')+'</button>':'')+(P.begun?' <button class="btn" id="tretake" type="button">Restart test</button>':'');
+  else $('#ctl').innerHTML='<button class="btn" id="restart" type="button">Clear my answers</button>';
+  if(t){$('#first').disabled=$('#prev').disabled=M.k===0;$('#next').disabled=M.k===n-1;if(TEACH_NAV)$('#nextsec').disabled=M.k===n-1}
+  document.querySelectorAll('.seg button').forEach(function(x){var off=testActive()&&x.dataset.mode!=='test';x.disabled=off;x.title=off?'Locked until you submit the test':''});
+  var y=scrollY;$('#sheet').innerHTML=t?sheet():practiceSheet();
+  if(PEEK&&!t&&window.Spoiler)Spoiler.scan($('#sheet'),function(el){P.peeked[el.getAttribute('data-peek')]=true});$('#pbar').hidden=true;
+  if(!t){scrollTo(0,y);return}
+  var c=document.querySelector('.sheet .cur');if(c)c.scrollIntoView({block:'center',behavior:'smooth'});
+}
+/* ---------- teach: autoplay and next section ----------
+   STEPS is the list of every construction step, and the worksheet shows steps 0..M.k.
+   Play: a timer calls go(M.k+1), exactly what the Next button does, every PLAY_MS,
+   and stops itself at the last step. Next section: move forward until the step's
+   stage (ff, items, table, conflicts, parse) changes. */
+var PLAY_MS=1200,playTimer=null;
+function startPlay(){if(M.k>=STEPS.length-1)M.k=0;playTimer=setInterval(function(){if(M.k>=STEPS.length-1){stopPlay();render();return}go(M.k+1)},PLAY_MS);render()}
+function stopPlay(){clearInterval(playTimer);playTimer=null}
+function nextSection(){var k=M.k,stage=STEPS[k].stage;while(k<STEPS.length-1&&STEPS[k].stage===stage)k++;go(k)}
+function go(k){M.k=Math.max(0,Math.min(STEPS.length-1,k));render()}
+document.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.mode){if(testActive()&&b.dataset.mode!=='test')return;stopPlay();M.mode=b.dataset.mode;P=PS[M.mode]||P;document.querySelectorAll('.seg button').forEach(function(x){x.classList.toggle('on',x===b)});render();scrollTo(0,0);return}
+  if(b.id==='next')go(M.k+1);
+  if(b.id==='nextsec')nextSection();
+  if(b.id==='play'){if(playTimer){stopPlay();render()}else startPlay()}if(b.id==='prev')go(M.k-1);if(b.id==='first')go(0);
+  if(b.dataset.check){check(+b.dataset.check,false);render()}
+  if(b.dataset.show){check(+b.dataset.show,true);render()}
+  if(b.id==='addst'){P.nStates++;render()}if(b.id==='delst'){P.nStates--;render()}
+  if(b.id==='addrow'){P.nRows++;render()}if(b.id==='delrow'){P.nRows--;render()}
+  if(b.id==='clear'){editor.setCfg({grammar:'',input:'',spaceOnly:false});var f=document.querySelector('.pe-lhs');if(f)f.focus();return}
+  if(b.id==='edit'){$('#inputs').classList.remove('collapsed');$('#inputs').scrollIntoView({behavior:'smooth'})}
+  if(b.id==='pnext'){if(M.k===STEPS.length-1){$('#fb')&&($('#fb').innerHTML='Finished. Score '+M.score+' of '+STEPS.filter(function(x){return question(x)}).length+' (first-try answers).');return}M.answered[M.k]=true;go(M.k+1)}
+  if(b.id==='show')answer('',true);
+  if(b.id==='restart'){P.v={};P.res={};P.want={};P.peeked={};P.nStates=1;P.nRows=1;render()}
+  if(b.id==='tsubmit')submitTest();
+  if('print' in b.dataset)window.print();
+  if(b.id==='tbegin'){P.begun=true;startClock();render();var fi=document.getElementById('p-aug');if(fi)fi.focus()}
+  if(b.id==='tpause'){if(P.t0)pauseClock();else startClock();render()}
+  if(b.id==='tretake'&&(P.submitted||confirm('Restart the test? Your answers and the stopwatch are cleared.'))){P=PS.test=freshP();render();scrollTo(0,0)}
+  if(b.id==='theme'){var nx=isDark()?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('slr.theme',nx)}catch(err){}themeIcon()}});
+document.addEventListener('input',function(e){if(e.target.id&&e.target.id.indexOf('p-')===0){if(locked()){e.target.value=P.v[e.target.id]||'';return}P.v[e.target.id]=e.target.value;if(TEST()&&!P.t0&&!P.submitted){startClock();var tp=$('#tpause');if(tp)tp.textContent='Pause'}}});
+document.addEventListener('submit',function(e){if(e.target.id==='pform'){e.preventDefault();answer($('#pans').value,false)}});
+document.addEventListener('keydown',function(e){if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||M.mode!=='teach'||!s)return;if(e.key==='ArrowRight')go(M.k+1);if(e.key==='ArrowLeft')go(M.k-1)});
+var cfg=Core.initial();editor.setCfg(cfg);build(cfg);
+})();
+</script></body></html>

@@ -1,0 +1,11 @@
+{
+  "name": "slr1-visualizer",
+  "version": "1.0.0",
+  "description": "Step-by-step GUI visualization of an SLR(1) parser, with a practice mode. Compiler Design Lab, L37 + L38.",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run-tests.js",
+    "start": "python -m http.server 5173"
+  },
+  "license": "UNLICENSED"
+}
